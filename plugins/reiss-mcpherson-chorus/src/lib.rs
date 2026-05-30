@@ -8,6 +8,8 @@ use truce_gui_types::layout::{GridLayout, dropdown, knob, toggle, widgets};
 use ChorusParamsParamId as P;
 
 const MAX_DELAY_SECS: f32 = 0.1;
+const MAX_BLOCK: usize = 512;
+const MAX_VOICES_MINUS_ONE: usize = 4;
 
 #[derive(ParamEnum)]
 pub enum Waveform {
@@ -172,13 +174,14 @@ impl PluginLogic for Chorus {
         self.lfo_phase = 0.0;
     }
 
+    #[allow(clippy::needless_range_loop)]
     fn process(
         &mut self,
         buffer: &mut AudioBuffer,
         _events: &EventList,
         _context: &mut ProcessContext,
     ) -> ProcessStatus {
-        let n = buffer.num_samples();
+        let total = buffer.num_samples();
         let buf_len = self.buffer_len;
         #[allow(clippy::cast_precision_loss)]
         let buf_len_f = buf_len as f32;
@@ -188,55 +191,36 @@ impl PluginLogic for Chorus {
         #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         let num_voices = self.params.voices.value().clamp(2, 5) as usize;
         let num_ch = buffer.channels().min(self.buffer.len());
+        let num_wet = num_voices - 1;
 
-        // Sample-outer / channel-inner: smoothers + shared LFO
-        // phase advance once per sample.
-        for i in 0..n {
-            let delay = self.params.delay.read();
-            let width = self.params.width.read();
-            let depth = self.params.depth.read();
-            let rate = self.params.rate.read();
-            let write = self.write_pos;
-            let ph = self.lfo_phase;
+        let mut offset = 0;
+        while offset < total {
+            let n = (total - offset).min(MAX_BLOCK);
 
-            for ch in 0..num_ch {
-                let (inp, out) = buffer.io(ch);
-                let in_sample = inp[i];
-                let line = &mut self.buffer[ch];
+            let delay = self.params.delay.read_block::<MAX_BLOCK>();
+            let width = self.params.width.read_block::<MAX_BLOCK>();
+            let depth = self.params.depth.read_block::<MAX_BLOCK>();
+            let rate = self.params.rate.read_block::<MAX_BLOCK>();
 
-                let mut acc = in_sample;
+            // Pre-build the per-voice read trajectories and the
+            // shared write head. Read positions are voice-shared
+            // across channels (chorus depends only on the LFO,
+            // not the channel index), so we don't need a per-
+            // channel copy.
+            let mut read_pos =
+                [[0.0_f32; MAX_BLOCK]; MAX_VOICES_MINUS_ONE];
+            let mut write_idx = [0usize; MAX_BLOCK];
+            for i in 0..n {
+                write_idx[i] = self.write_pos;
                 let mut phase_offset = 0.0_f32;
-
-                for voice in 0..num_voices - 1 {
-                    let weight = if stereo && num_voices > 2 {
-                        #[allow(clippy::cast_precision_loss)]
-                        let mut w = voice as f32 / (num_voices - 2) as f32;
-                        if ch != 0 {
-                            w = 1.0 - w;
-                        }
-                        w
-                    } else {
-                        1.0
-                    };
-
+                for v in 0..num_wet {
                     let local_delay =
-                        (delay + width * lfo(ph + phase_offset, waveform)) * self.sample_rate;
+                        (delay[i] + width[i] * lfo(self.lfo_phase + phase_offset, waveform))
+                            * self.sample_rate;
                     #[allow(clippy::cast_precision_loss)]
-                    let read_pos = (write as f32 - local_delay + buf_len_f).rem_euclid(buf_len_f);
-                    let voiced = sample_at(line, read_pos, buf_len, interp);
-
-                    if stereo && num_voices == 2 {
-                        // Voice 1 (channel 0) is dry; wet channel is
-                        // overwritten with the modulated tap.
-                        if ch == 0 {
-                            acc = in_sample;
-                        } else {
-                            acc = voiced * depth;
-                        }
-                    } else {
-                        acc += voiced * depth * weight;
-                    }
-
+                    let pos = (self.write_pos as f32 - local_delay + buf_len_f)
+                        .rem_euclid(buf_len_f);
+                    read_pos[v][i] = pos;
                     if num_voices == 3 {
                         phase_offset += 0.25;
                     } else if num_voices > 3 {
@@ -245,19 +229,53 @@ impl PluginLogic for Chorus {
                         phase_offset += step;
                     }
                 }
-
-                out[i] = acc;
-                line[write] = in_sample;
+                self.write_pos += 1;
+                if self.write_pos >= buf_len {
+                    self.write_pos -= buf_len;
+                }
+                self.lfo_phase += rate[i] / self.sample_rate;
+                if self.lfo_phase >= 1.0 {
+                    self.lfo_phase -= 1.0;
+                }
             }
 
-            self.write_pos += 1;
-            if self.write_pos >= buf_len {
-                self.write_pos -= buf_len;
+            for ch in 0..num_ch {
+                let (inp, out) = buffer.io(ch);
+                let line = &mut self.buffer[ch];
+                for i in 0..n {
+                    let idx = offset + i;
+                    let in_sample = inp[idx];
+                    let mut acc = in_sample;
+
+                    for v in 0..num_wet {
+                        let weight = if stereo && num_voices > 2 {
+                            #[allow(clippy::cast_precision_loss)]
+                            let mut w = v as f32 / (num_voices - 2) as f32;
+                            if ch != 0 {
+                                w = 1.0 - w;
+                            }
+                            w
+                        } else {
+                            1.0
+                        };
+                        let voiced = sample_at(line, read_pos[v][i], buf_len, interp);
+                        if stereo && num_voices == 2 {
+                            if ch == 0 {
+                                acc = in_sample;
+                            } else {
+                                acc = voiced * depth[i];
+                            }
+                        } else {
+                            acc += voiced * depth[i] * weight;
+                        }
+                    }
+
+                    out[idx] = acc;
+                    line[write_idx[i]] = in_sample;
+                }
             }
-            self.lfo_phase += rate / self.sample_rate;
-            if self.lfo_phase >= 1.0 {
-                self.lfo_phase -= 1.0;
-            }
+
+            offset += n;
         }
 
         ProcessStatus::Normal

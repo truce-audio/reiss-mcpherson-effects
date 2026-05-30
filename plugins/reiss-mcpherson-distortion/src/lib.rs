@@ -7,6 +7,8 @@ use truce_gui_types::layout::{GridLayout, dropdown, knob, widgets};
 
 use DistortionParamsParamId as P;
 
+const MAX_BLOCK: usize = 512;
+
 #[derive(ParamEnum)]
 pub enum DistortionType {
     #[name = "Hard Clip"]
@@ -160,31 +162,43 @@ impl PluginLogic for Distortion {
         _events: &EventList,
         _context: &mut ProcessContext,
     ) -> ProcessStatus {
-        let n = buffer.num_samples();
+        let total = buffer.num_samples();
         let ty = self.params.distortion_type.value();
-        // Re-derive shelf coefficients once per block - tone is
-        // smoothed but recomputing per-sample buys nothing audible
-        // at this cut-off.
-        // `read_after(n)` advances the smoother by the whole block;
-        // recomputing the shelf at sample rate buys nothing audible
-        // at PI*0.01 cut-off but starving the smoother would.
-        let tone = self.params.tone.read_after(n);
-        for s in &mut self.shelves {
-            s.update(tone);
-        }
-
         let num_ch = buffer.channels().min(self.shelves.len());
-        // Sample-outer / channel-inner: smoothed gain reads happen
-        // once per sample, applied across all channels.
-        for i in 0..n {
-            let in_gain = 10f32.powf(self.params.input_gain.read() * 0.05);
-            let out_gain = 10f32.powf(self.params.output_gain.read() * 0.05);
+
+        let mut offset = 0;
+        while offset < total {
+            let n = (total - offset).min(MAX_BLOCK);
+
+            // Tone shelf rebuilds once per chunk - recomputing at
+            // sample rate buys nothing audible at PI*0.01 cut-off
+            // and we still need the smoother advanced by `n`.
+            let tone = self.params.tone.read_after(n);
+            for s in &mut self.shelves {
+                s.update(tone);
+            }
+
+            let in_gain = self.params.input_gain.read_block::<MAX_BLOCK>();
+            let out_gain = self.params.output_gain.read_block::<MAX_BLOCK>();
+            let mut in_lin = [0.0_f32; MAX_BLOCK];
+            let mut out_lin = [0.0_f32; MAX_BLOCK];
+            for i in 0..n {
+                in_lin[i] = 10f32.powf(in_gain[i] * 0.05);
+                out_lin[i] = 10f32.powf(out_gain[i] * 0.05);
+            }
+
             for ch in 0..num_ch {
                 let (inp, out) = buffer.io(ch);
-                let shaped = shape(inp[i] * in_gain, ty);
-                let filtered = self.shelves[ch].process(shaped);
-                out[i] = filtered * out_gain;
+                let s = &mut self.shelves[ch];
+                for i in 0..n {
+                    let idx = offset + i;
+                    let shaped = shape(inp[idx] * in_lin[i], ty);
+                    let filtered = s.process(shaped);
+                    out[idx] = filtered * out_lin[i];
+                }
             }
+
+            offset += n;
         }
         ProcessStatus::Normal
     }

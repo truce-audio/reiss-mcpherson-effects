@@ -10,6 +10,7 @@ use PhaserParamsParamId as P;
 
 const MAX_FILTERS_PER_CHANNEL: usize = 10;
 const UPDATE_INTERVAL: u32 = 32;
+const MAX_BLOCK: usize = 512;
 
 #[derive(ParamEnum)]
 pub enum Waveform {
@@ -197,60 +198,79 @@ impl PluginLogic for Phaser {
         self.sample_counter = 0;
     }
 
+    #[allow(clippy::needless_range_loop)]
     fn process(
         &mut self,
         buffer: &mut AudioBuffer,
         _events: &EventList,
         _context: &mut ProcessContext,
     ) -> ProcessStatus {
-        let n = buffer.num_samples();
+        let total = buffer.num_samples();
         let waveform = self.params.waveform.value();
         let stereo = self.params.stereo.value();
         let num_filters = self.params.stages.value().count();
         let num_ch = buffer.channels().min(self.filters.len());
 
-        // Sample-outer / channel-inner: smoothers + shared
-        // sample_counter + shared lfo_phase advance once per sample,
-        // applied across both channels (with stereo phase offset
-        // computed per-channel from the shared phase).
-        for i in 0..n {
-            let depth = self.params.depth.read();
-            let feedback = self.params.feedback.read();
-            let min_f = self.params.min_freq.read();
-            let sweep = self.params.sweep_width.read();
-            let rate = self.params.lfo_rate.read();
-            let update_filters = self.sample_counter.is_multiple_of(UPDATE_INTERVAL);
+        let mut offset = 0;
+        while offset < total {
+            let n = (total - offset).min(MAX_BLOCK);
 
-            for ch in 0..num_ch {
-                let phase = if stereo && ch != 0 {
-                    (self.lfo_phase + 0.25).rem_euclid(1.0)
-                } else {
-                    self.lfo_phase
-                };
-                let centre = min_f + sweep * lfo(phase, waveform);
+            let depth = self.params.depth.read_block::<MAX_BLOCK>();
+            let feedback = self.params.feedback.read_block::<MAX_BLOCK>();
+            let min_f = self.params.min_freq.read_block::<MAX_BLOCK>();
+            let sweep = self.params.sweep_width.read_block::<MAX_BLOCK>();
+            let rate = self.params.lfo_rate.read_block::<MAX_BLOCK>();
 
-                if update_filters {
-                    let discrete = std::f32::consts::TAU * centre * self.inv_sr;
-                    for filter in &mut self.filters[ch][..num_filters] {
-                        filter.update(discrete);
+            // Schedule coefficient updates - each entry is the
+            // discrete frequency to install (or NaN for "no update
+            // this sample"). One array per channel because the
+            // stereo phase offset diverges the two LFOs.
+            let mut sched = [[f32::NAN; MAX_BLOCK]; 2];
+            for i in 0..n {
+                let update_now = self.sample_counter.is_multiple_of(UPDATE_INTERVAL);
+                if update_now {
+                    for ch in 0..num_ch.min(2) {
+                        let ph = if stereo && ch != 0 {
+                            (self.lfo_phase + 0.25).rem_euclid(1.0)
+                        } else {
+                            self.lfo_phase
+                        };
+                        let centre = min_f[i] + sweep[i] * lfo(ph, waveform);
+                        sched[ch][i] = std::f32::consts::TAU * centre * self.inv_sr;
                     }
                 }
-
-                let (inp, out) = buffer.io(ch);
-                let in_sample = inp[i];
-                let mut filtered = in_sample + feedback * self.feedback_state[ch];
-                for filter in &mut self.filters[ch][..num_filters] {
-                    filtered = filter.process(filtered);
+                self.sample_counter = self.sample_counter.wrapping_add(1);
+                self.lfo_phase += rate[i] * self.inv_sr;
+                if self.lfo_phase >= 1.0 {
+                    self.lfo_phase -= 1.0;
                 }
-                self.feedback_state[ch] = filtered;
-                out[i] = in_sample + depth * (filtered - in_sample) * 0.5;
             }
 
-            self.sample_counter = self.sample_counter.wrapping_add(1);
-            self.lfo_phase += rate * self.inv_sr;
-            if self.lfo_phase >= 1.0 {
-                self.lfo_phase -= 1.0;
+            for ch in 0..num_ch {
+                let (inp, out) = buffer.io(ch);
+                let filters = &mut self.filters[ch][..num_filters];
+                let sched_ch = &sched[ch.min(1)];
+                let mut fb = self.feedback_state[ch];
+                for i in 0..n {
+                    let discrete = sched_ch[i];
+                    if !discrete.is_nan() {
+                        for filter in filters.iter_mut() {
+                            filter.update(discrete);
+                        }
+                    }
+                    let idx = offset + i;
+                    let in_sample = inp[idx];
+                    let mut filtered = in_sample + feedback[i] * fb;
+                    for filter in filters.iter_mut() {
+                        filtered = filter.process(filtered);
+                    }
+                    fb = filtered;
+                    out[idx] = in_sample + depth[i] * (filtered - in_sample) * 0.5;
+                }
+                self.feedback_state[ch] = fb;
             }
+
+            offset += n;
         }
 
         ProcessStatus::Normal

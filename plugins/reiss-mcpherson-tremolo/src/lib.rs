@@ -7,6 +7,11 @@ use truce_gui_types::layout::{GridLayout, dropdown, knob, widgets};
 
 use TremoloParamsParamId as P;
 
+/// Upper bound on samples per inner chunk. Each smoothed param gets
+/// a `[f32; MAX_BLOCK]` scratch so the channel-major hot loop reads
+/// from a stack array instead of calling `.read()` per sample.
+const MAX_BLOCK: usize = 512;
+
 #[derive(ParamEnum)]
 pub enum Waveform {
     Sine,
@@ -119,31 +124,51 @@ impl PluginLogic for Tremolo {
         self.lfo_phase = 0.0;
     }
 
+    // Hot-path loops index multiple stack arrays (gain, depth, rate,
+    // in/out at offset + i) by a shared `i`. Iterator+zip chains
+    // would obscure the channel-major shape we're optimising for.
+    #[allow(clippy::needless_range_loop)]
     fn process(
         &mut self,
         buffer: &mut AudioBuffer,
         _events: &EventList,
         _context: &mut ProcessContext,
     ) -> ProcessStatus {
-        let n = buffer.num_samples();
+        let total = buffer.num_samples();
         let waveform = self.params.waveform.value();
         let num_ch = buffer.channels();
 
-        // Sample-outer / channel-inner: smoothers + LFO advance
-        // once per sample, applied to every channel.
-        for i in 0..n {
-            let depth = self.params.depth.read();
-            let rate = self.params.rate.read();
-            let modulation = lfo(self.lfo_phase, waveform);
-            let gain = 1.0 - depth + depth * modulation;
+        // Walk the buffer in MAX_BLOCK chunks. Per chunk: one
+        // block-read advances the smoother by exactly N samples,
+        // we precompute the LFO modulation curve once, then
+        // channel-major loops iterate the inner samples (the
+        // shape LLVM is happiest vectorising).
+        let mut offset = 0;
+        while offset < total {
+            let n = (total - offset).min(MAX_BLOCK);
+
+            let depth = self.params.depth.read_block::<MAX_BLOCK>();
+            let rate = self.params.rate.read_block::<MAX_BLOCK>();
+
+            let mut gain = [0.0_f32; MAX_BLOCK];
+            for i in 0..n {
+                let m = lfo(self.lfo_phase, waveform);
+                gain[i] = 1.0 - depth[i] + depth[i] * m;
+                self.lfo_phase += rate[i] * self.inv_sr;
+                if self.lfo_phase >= 1.0 {
+                    self.lfo_phase -= 1.0;
+                }
+            }
+
             for ch in 0..num_ch {
                 let (inp, out) = buffer.io(ch);
-                out[i] = inp[i] * gain;
+                for i in 0..n {
+                    let idx = offset + i;
+                    out[idx] = inp[idx] * gain[i];
+                }
             }
-            self.lfo_phase += rate * self.inv_sr;
-            if self.lfo_phase >= 1.0 {
-                self.lfo_phase -= 1.0;
-            }
+
+            offset += n;
         }
         ProcessStatus::Normal
     }

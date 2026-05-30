@@ -8,6 +8,7 @@ use truce_gui_types::layout::{GridLayout, knob, widgets};
 use DelayParamsParamId as P;
 
 const MAX_DELAY_SECS: f32 = 5.0;
+const MAX_BLOCK: usize = 512;
 
 #[derive(Params)]
 pub struct DelayParams {
@@ -81,49 +82,67 @@ impl PluginLogic for Delay {
         _events: &EventList,
         _context: &mut ProcessContext,
     ) -> ProcessStatus {
-        let n = buffer.num_samples();
+        let total = buffer.num_samples();
         let buf_len = self.buffer_len;
         #[allow(clippy::cast_precision_loss)]
         let buf_len_f = buf_len as f32;
         let num_ch = buffer.channels().min(self.buffer.len());
 
-        // Sample-outer / channel-inner so each smoothed param is
-        // read exactly once per sample - reading inside the channel
-        // loop would advance the smoother N × num_channels times
-        // per block.
-        for i in 0..n {
-            let delay_secs = self.params.delay_time.read();
-            let feedback = self.params.feedback.read();
-            let mix = self.params.mix.read();
-            let delay_samples = delay_secs * self.sample_rate;
-            let write = self.write_pos;
+        let mut offset = 0;
+        while offset < total {
+            let n = (total - offset).min(MAX_BLOCK);
 
-            #[allow(clippy::cast_precision_loss)]
-            let read_pos = (write as f32 - delay_samples + buf_len_f).rem_euclid(buf_len_f);
-            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-            let read_idx = read_pos.floor() as usize;
-            let frac = read_pos - read_pos.floor();
+            let delay_secs = self.params.delay_time.read_block::<MAX_BLOCK>();
+            let feedback = self.params.feedback.read_block::<MAX_BLOCK>();
+            let mix = self.params.mix.read_block::<MAX_BLOCK>();
 
-            for ch in 0..num_ch {
-                let (inp, out) = buffer.io(ch);
-                let in_sample = inp[i];
-                let line = &mut self.buffer[ch];
-                if read_idx == write {
-                    out[i] = in_sample;
-                    line[write] = in_sample;
-                } else {
-                    let d0 = line[read_idx];
-                    let d1 = line[(read_idx + 1) % buf_len];
-                    let delayed = d0 + frac * (d1 - d0);
-                    out[i] = in_sample + mix * (delayed - in_sample);
-                    line[write] = in_sample + delayed * feedback;
+            // Precompute the read-position trajectory for the chunk
+            // so the inner channel-major loop reads from stack
+            // arrays only - no divides, no modulos.
+            let mut read_idx = [0usize; MAX_BLOCK];
+            let mut frac_arr = [0.0_f32; MAX_BLOCK];
+            let mut write_idx = [0usize; MAX_BLOCK];
+            let mut bypass = [false; MAX_BLOCK];
+            for i in 0..n {
+                let delay_samples = delay_secs[i] * self.sample_rate;
+                let write = self.write_pos;
+                #[allow(clippy::cast_precision_loss)]
+                let read_pos =
+                    (write as f32 - delay_samples + buf_len_f).rem_euclid(buf_len_f);
+                #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+                let r0 = read_pos.floor() as usize;
+                read_idx[i] = r0;
+                frac_arr[i] = read_pos - read_pos.floor();
+                write_idx[i] = write;
+                bypass[i] = r0 == write;
+                self.write_pos += 1;
+                if self.write_pos >= buf_len {
+                    self.write_pos -= buf_len;
                 }
             }
 
-            self.write_pos += 1;
-            if self.write_pos >= buf_len {
-                self.write_pos -= buf_len;
+            for ch in 0..num_ch {
+                let (inp, out) = buffer.io(ch);
+                let line = &mut self.buffer[ch];
+                for i in 0..n {
+                    let idx = offset + i;
+                    let in_sample = inp[idx];
+                    let write = write_idx[i];
+                    if bypass[i] {
+                        out[idx] = in_sample;
+                        line[write] = in_sample;
+                    } else {
+                        let r0 = read_idx[i];
+                        let d0 = line[r0];
+                        let d1 = line[(r0 + 1) % buf_len];
+                        let delayed = d0 + frac_arr[i] * (d1 - d0);
+                        out[idx] = in_sample + mix[i] * (delayed - in_sample);
+                        line[write] = in_sample + delayed * feedback[i];
+                    }
+                }
             }
+
+            offset += n;
         }
 
         ProcessStatus::Normal

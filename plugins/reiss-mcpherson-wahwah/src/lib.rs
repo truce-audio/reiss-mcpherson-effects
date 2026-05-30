@@ -8,6 +8,8 @@ use truce_gui_types::layout::{GridLayout, dropdown, knob, section};
 
 use WahWahParamsParamId as P;
 
+const MAX_BLOCK: usize = 512;
+
 #[derive(ParamEnum)]
 pub enum Mode {
     Manual,
@@ -243,65 +245,77 @@ impl PluginLogic for WahWah {
         _events: &EventList,
         _context: &mut ProcessContext,
     ) -> ProcessStatus {
-        let n = buffer.num_samples();
+        let total = buffer.num_samples();
         let mode = self.params.mode.value();
         let ty = self.params.filter_type.value();
         let num_ch = buffer.channels().min(self.filters.len());
+        let automatic = matches!(mode, Mode::Automatic);
 
-        // Sample-outer / channel-inner: smoothers + LFO phase
-        // advance once per sample. Envelope follower stays per-
-        // channel (peak detection on each channel's own input).
-        for i in 0..n {
-            let mix = self.params.mix.read();
-            let attack = attack_release_coeff(self.params.env_attack.read(), self.inv_sr);
-            let release = attack_release_coeff(self.params.env_release.read(), self.inv_sr);
-            let lfo_rate = self.params.lfo_rate.read();
-            let lfo_env_mix = self.params.lfo_env_mix.read();
-            let manual_freq = self.params.frequency.read();
-            let q = f64::from(self.params.q.read());
-            let gain_lin = 10f64.powf(f64::from(self.params.gain.read()) * 0.05);
+        let mut offset = 0;
+        while offset < total {
+            let n = (total - offset).min(MAX_BLOCK);
 
-            for ch in 0..num_ch {
-                let in_sample = buffer.io(ch).0[i];
-                let abs_in = in_sample.abs();
-                let mut env = self.envelopes[ch];
-                env = if abs_in > env {
-                    attack * env + (1.0 - attack) * abs_in
-                } else {
-                    release * env + (1.0 - release) * abs_in
-                };
-                self.envelopes[ch] = env;
+            let mix = self.params.mix.read_block::<MAX_BLOCK>();
+            let env_attack = self.params.env_attack.read_block::<MAX_BLOCK>();
+            let env_release = self.params.env_release.read_block::<MAX_BLOCK>();
+            let lfo_rate = self.params.lfo_rate.read_block::<MAX_BLOCK>();
+            let lfo_env_mix = self.params.lfo_env_mix.read_block::<MAX_BLOCK>();
+            let manual_freq = self.params.frequency.read_block::<MAX_BLOCK>();
+            let q_arr = self.params.q.read_block::<MAX_BLOCK>();
+            let gain_arr = self.params.gain.read_block::<MAX_BLOCK>();
 
-                let centre_freq_hz = match mode {
-                    Mode::Manual => manual_freq,
-                    Mode::Automatic => {
-                        let lfo_norm = 0.5 + 0.5 * (std::f32::consts::TAU * self.lfo_phase).sin();
-                        let env_norm = env.clamp(0.0, 1.0);
-                        let mixed = lfo_norm + lfo_env_mix * (env_norm - lfo_norm);
-                        MIN_HZ + mixed * (MAX_HZ - MIN_HZ)
+            // Pre-compute attack/release coefficients and the
+            // shared LFO contribution so the inner channel-major
+            // loop only does per-channel envelope + filter work.
+            let mut attack_co = [0.0_f32; MAX_BLOCK];
+            let mut release_co = [0.0_f32; MAX_BLOCK];
+            let mut lfo_norm = [0.0_f32; MAX_BLOCK];
+            for i in 0..n {
+                attack_co[i] = attack_release_coeff(env_attack[i], self.inv_sr);
+                release_co[i] = attack_release_coeff(env_release[i], self.inv_sr);
+                if automatic {
+                    lfo_norm[i] =
+                        0.5 + 0.5 * (std::f32::consts::TAU * self.lfo_phase).sin();
+                    self.lfo_phase += lfo_rate[i] * self.inv_sr;
+                    if self.lfo_phase >= 1.0 {
+                        self.lfo_phase -= 1.0;
                     }
-                };
-
-                update(
-                    &mut self.filters[ch],
-                    f64::from(centre_freq_hz),
-                    q,
-                    gain_lin,
-                    ty,
-                    self.sample_rate,
-                );
-
-                #[allow(clippy::cast_possible_truncation)]
-                let filtered = self.filters[ch].process(f64::from(in_sample)) as f32;
-                buffer.io(ch).1[i] = in_sample + mix * (filtered - in_sample);
-            }
-
-            if matches!(mode, Mode::Automatic) {
-                self.lfo_phase += lfo_rate * self.inv_sr;
-                if self.lfo_phase >= 1.0 {
-                    self.lfo_phase -= 1.0;
                 }
             }
+
+            for ch in 0..num_ch {
+                let (inp, out) = buffer.io(ch);
+                let filter = &mut self.filters[ch];
+                let mut env = self.envelopes[ch];
+                for i in 0..n {
+                    let idx = offset + i;
+                    let in_sample = inp[idx];
+                    let abs_in = in_sample.abs();
+                    env = if abs_in > env {
+                        attack_co[i] * env + (1.0 - attack_co[i]) * abs_in
+                    } else {
+                        release_co[i] * env + (1.0 - release_co[i]) * abs_in
+                    };
+
+                    let centre_freq_hz = if automatic {
+                        let env_norm = env.clamp(0.0, 1.0);
+                        let mixed = lfo_norm[i] + lfo_env_mix[i] * (env_norm - lfo_norm[i]);
+                        MIN_HZ + mixed * (MAX_HZ - MIN_HZ)
+                    } else {
+                        manual_freq[i]
+                    };
+                    let q = f64::from(q_arr[i]);
+                    let gain_lin = 10f64.powf(f64::from(gain_arr[i]) * 0.05);
+                    update(filter, f64::from(centre_freq_hz), q, gain_lin, ty, self.sample_rate);
+
+                    #[allow(clippy::cast_possible_truncation)]
+                    let filtered = filter.process(f64::from(in_sample)) as f32;
+                    out[idx] = in_sample + mix[i] * (filtered - in_sample);
+                }
+                self.envelopes[ch] = env;
+            }
+
+            offset += n;
         }
 
         ProcessStatus::Normal

@@ -8,6 +8,8 @@ use truce_gui_types::layout::{GridLayout, dropdown, knob, widgets};
 
 use RingModParamsParamId as P;
 
+const MAX_BLOCK: usize = 512;
+
 #[derive(ParamEnum)]
 pub enum Waveform {
     Sine,
@@ -118,33 +120,45 @@ impl PluginLogic for RingMod {
         self.lfo_phase = 0.0;
     }
 
+    #[allow(clippy::needless_range_loop)]
     fn process(
         &mut self,
         buffer: &mut AudioBuffer,
         _events: &EventList,
         _context: &mut ProcessContext,
     ) -> ProcessStatus {
-        let n = buffer.num_samples();
+        let total = buffer.num_samples();
         let waveform = self.params.waveform.value();
         let num_ch = buffer.channels();
 
-        // Sample-outer / channel-inner: smoothers + carrier phase
-        // advance once per sample, applied to every channel.
-        for i in 0..n {
-            let depth = self.params.depth.read();
-            let freq = self.params.frequency.read();
-            // Bipolar carrier in [-1, 1]; depth crossfades from
-            // dry (depth=0) to fully modulated (depth=1).
-            let carrier = 2.0 * lfo(self.lfo_phase, waveform) - 1.0;
-            let gain = 1.0 - depth + depth * carrier;
+        let mut offset = 0;
+        while offset < total {
+            let n = (total - offset).min(MAX_BLOCK);
+
+            let depth = self.params.depth.read_block::<MAX_BLOCK>();
+            let freq = self.params.frequency.read_block::<MAX_BLOCK>();
+
+            let mut gain = [0.0_f32; MAX_BLOCK];
+            for i in 0..n {
+                // Bipolar carrier in [-1, 1]; depth crossfades from
+                // dry (depth=0) to fully modulated (depth=1).
+                let carrier = 2.0 * lfo(self.lfo_phase, waveform) - 1.0;
+                gain[i] = 1.0 - depth[i] + depth[i] * carrier;
+                self.lfo_phase += freq[i] * self.inv_sr;
+                if self.lfo_phase >= 1.0 {
+                    self.lfo_phase -= 1.0;
+                }
+            }
+
             for ch in 0..num_ch {
                 let (inp, out) = buffer.io(ch);
-                out[i] = inp[i] * gain;
+                for i in 0..n {
+                    let idx = offset + i;
+                    out[idx] = inp[idx] * gain[i];
+                }
             }
-            self.lfo_phase += freq * self.inv_sr;
-            if self.lfo_phase >= 1.0 {
-                self.lfo_phase -= 1.0;
-            }
+
+            offset += n;
         }
         ProcessStatus::Normal
     }

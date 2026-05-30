@@ -8,6 +8,7 @@ use truce_gui_types::layout::{GridLayout, dropdown, knob, toggle, widgets};
 use FlangerParamsParamId as P;
 
 const MAX_DELAY_SECS: f32 = 0.04;
+const MAX_BLOCK: usize = 512;
 
 #[derive(ParamEnum)]
 pub enum Waveform {
@@ -157,7 +158,7 @@ impl PluginLogic for Flanger {
         _events: &EventList,
         _context: &mut ProcessContext,
     ) -> ProcessStatus {
-        let n = buffer.num_samples();
+        let total = buffer.num_samples();
         let buf_len = self.buffer_len;
         #[allow(clippy::cast_precision_loss)]
         let buf_len_f = buf_len as f32;
@@ -171,68 +172,91 @@ impl PluginLogic for Flanger {
         };
         let num_ch = buffer.channels().min(self.buffer.len());
 
-        // Sample-outer / channel-inner: smoothers + LFO phase
-        // advance once per sample. Stereo LFO offset (0.25) is
-        // applied per channel from the shared phase, so both
-        // channels still get an in-quadrature sweep without
-        // double-stepping the smoother.
-        for i in 0..n {
-            let delay = self.params.delay.read();
-            let width = self.params.width.read();
-            let depth = self.params.depth.read();
-            let feedback = self.params.feedback.read();
-            let rate = self.params.rate.read();
-            let write = self.write_pos;
+        let mut offset = 0;
+        while offset < total {
+            let n = (total - offset).min(MAX_BLOCK);
+
+            let delay = self.params.delay.read_block::<MAX_BLOCK>();
+            let width = self.params.width.read_block::<MAX_BLOCK>();
+            let depth = self.params.depth.read_block::<MAX_BLOCK>();
+            let feedback = self.params.feedback.read_block::<MAX_BLOCK>();
+            let rate = self.params.rate.read_block::<MAX_BLOCK>();
+
+            // Per-channel read trajectories so the stereo LFO
+            // offset is baked into the read-position arrays once
+            // and the inner channel-major loop stays pure
+            // stack-array reads.
+            let mut read_idx = [[0usize; MAX_BLOCK]; 2];
+            let mut frac_arr = [[0.0_f32; MAX_BLOCK]; 2];
+            let mut write_idx = [0usize; MAX_BLOCK];
+
+            // Advance the shared LFO phase + write head once per
+            // sample, snapshotting per-channel read positions.
+            for i in 0..n {
+                let write = self.write_pos;
+                write_idx[i] = write;
+                for ch in 0..num_ch.min(2) {
+                    let ph = if stereo && ch != 0 {
+                        (self.lfo_phase + 0.25).rem_euclid(1.0)
+                    } else {
+                        self.lfo_phase
+                    };
+                    let delay_samples =
+                        (delay[i] + width[i] * lfo(ph, waveform)) * self.sample_rate;
+                    #[allow(clippy::cast_precision_loss)]
+                    let read_pos =
+                        (write as f32 - delay_samples + buf_len_f).rem_euclid(buf_len_f);
+                    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+                    let r0 = read_pos.floor() as usize % buf_len;
+                    read_idx[ch][i] = r0;
+                    frac_arr[ch][i] = read_pos - read_pos.floor();
+                }
+                self.write_pos += 1;
+                if self.write_pos >= buf_len {
+                    self.write_pos -= buf_len;
+                }
+                self.lfo_phase += rate[i] / self.sample_rate;
+                if self.lfo_phase >= 1.0 {
+                    self.lfo_phase -= 1.0;
+                }
+            }
 
             for ch in 0..num_ch {
-                let ph = if stereo && ch != 0 {
-                    (self.lfo_phase + 0.25).rem_euclid(1.0)
-                } else {
-                    self.lfo_phase
-                };
-                let delay_samples = (delay + width * lfo(ph, waveform)) * self.sample_rate;
-
-                #[allow(clippy::cast_precision_loss)]
-                let read_pos = (write as f32 - delay_samples + buf_len_f).rem_euclid(buf_len_f);
-                #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-                let r0 = read_pos.floor() as usize % buf_len;
-                let frac = read_pos - read_pos.floor();
-
                 let (inp, out) = buffer.io(ch);
-                let in_sample = inp[i];
                 let line = &mut self.buffer[ch];
-                let delayed = match interp {
-                    Interpolation::Nearest => line[r0],
-                    Interpolation::Linear => {
-                        let s0 = line[r0];
-                        let s1 = line[(r0 + 1) % buf_len];
-                        s0 + frac * (s1 - s0)
-                    }
-                    Interpolation::Cubic => {
-                        let f2 = frac * frac;
-                        let f3 = f2 * frac;
-                        let s0 = line[(r0 + buf_len - 1) % buf_len];
-                        let s1 = line[r0];
-                        let s2 = line[(r0 + 1) % buf_len];
-                        let s3 = line[(r0 + 2) % buf_len];
-                        let a0 = -0.5 * s0 + 1.5 * s1 - 1.5 * s2 + 0.5 * s3;
-                        let a1 = s0 - 2.5 * s1 + 2.0 * s2 - 0.5 * s3;
-                        let a2 = -0.5 * s0 + 0.5 * s2;
-                        a0 * f3 + a1 * f2 + a2 * frac + s1
-                    }
-                };
-                out[i] = in_sample + delayed * depth * invert;
-                line[write] = in_sample + delayed * feedback;
+                let read_idx = &read_idx[ch];
+                let frac_arr = &frac_arr[ch];
+                for i in 0..n {
+                    let idx = offset + i;
+                    let in_sample = inp[idx];
+                    let r0 = read_idx[i];
+                    let frac = frac_arr[i];
+                    let delayed = match interp {
+                        Interpolation::Nearest => line[r0],
+                        Interpolation::Linear => {
+                            let s0 = line[r0];
+                            let s1 = line[(r0 + 1) % buf_len];
+                            s0 + frac * (s1 - s0)
+                        }
+                        Interpolation::Cubic => {
+                            let f2 = frac * frac;
+                            let f3 = f2 * frac;
+                            let s0 = line[(r0 + buf_len - 1) % buf_len];
+                            let s1 = line[r0];
+                            let s2 = line[(r0 + 1) % buf_len];
+                            let s3 = line[(r0 + 2) % buf_len];
+                            let a0 = -0.5 * s0 + 1.5 * s1 - 1.5 * s2 + 0.5 * s3;
+                            let a1 = s0 - 2.5 * s1 + 2.0 * s2 - 0.5 * s3;
+                            let a2 = -0.5 * s0 + 0.5 * s2;
+                            a0 * f3 + a1 * f2 + a2 * frac + s1
+                        }
+                    };
+                    out[idx] = in_sample + delayed * depth[i] * invert;
+                    line[write_idx[i]] = in_sample + delayed * feedback[i];
+                }
             }
 
-            self.write_pos += 1;
-            if self.write_pos >= buf_len {
-                self.write_pos -= buf_len;
-            }
-            self.lfo_phase += rate / self.sample_rate;
-            if self.lfo_phase >= 1.0 {
-                self.lfo_phase -= 1.0;
-            }
+            offset += n;
         }
 
         ProcessStatus::Normal
