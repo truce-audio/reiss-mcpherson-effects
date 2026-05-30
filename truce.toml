@@ -1,0 +1,137 @@
+# truce plugin project configuration for the Reiss / McPherson port.
+
+[vendor]
+name = "Reiss-McPherson"
+id = "com.reiss-mcpherson"
+url = "https://github.com/juandagilc/Audio-Effects"
+au_manufacturer = "Rmcp"
+
+[[plugin]]
+name = "Reiss Delay"
+bundle_id = "reiss-delay"
+crate = "reiss-mcpherson-delay"
+category = "effect"
+fourcc = "RDly"
+au3_subtype = "RDl3"
+au_tag = "Effects"
+aax_category = "Delay"
+
+[[plugin]]
+name = "Reiss Vibrato"
+bundle_id = "reiss-vibrato"
+crate = "reiss-mcpherson-vibrato"
+category = "effect"
+fourcc = "RVib"
+au3_subtype = "RVb3"
+au_tag = "Effects"
+aax_category = "Modulation"
+
+[[plugin]]
+name = "Reiss Flanger"
+bundle_id = "reiss-flanger"
+crate = "reiss-mcpherson-flanger"
+category = "effect"
+fourcc = "RFlg"
+au3_subtype = "RFl3"
+au_tag = "Effects"
+aax_category = "Modulation"
+
+[[plugin]]
+name = "Reiss Chorus"
+bundle_id = "reiss-chorus"
+crate = "reiss-mcpherson-chorus"
+category = "effect"
+fourcc = "RChr"
+au3_subtype = "RCh3"
+au_tag = "Effects"
+aax_category = "Modulation"
+
+[[plugin]]
+name = "Reiss Ping-Pong"
+bundle_id = "reiss-pingpong"
+crate = "reiss-mcpherson-pingpong"
+category = "effect"
+fourcc = "RPpD"
+au3_subtype = "RPp3"
+au_tag = "Effects"
+aax_category = "Delay"
+
+[[plugin]]
+name = "Reiss Parametric EQ"
+bundle_id = "reiss-parametric-eq"
+crate = "reiss-mcpherson-parametric-eq"
+category = "effect"
+fourcc = "RPeq"
+au3_subtype = "RPe3"
+au_tag = "EQ"
+aax_category = "EQ"
+
+[[plugin]]
+name = "Reiss Wah-Wah"
+bundle_id = "reiss-wahwah"
+crate = "reiss-mcpherson-wahwah"
+category = "effect"
+fourcc = "RWah"
+au3_subtype = "RWa3"
+au_tag = "Effects"
+aax_category = "Modulation"
+
+[[plugin]]
+name = "Reiss Phaser"
+bundle_id = "reiss-phaser"
+crate = "reiss-mcpherson-phaser"
+category = "effect"
+fourcc = "RPhs"
+au3_subtype = "RPh3"
+au_tag = "Effects"
+aax_category = "Modulation"
+
+[[plugin]]
+name = "Reiss Tremolo"
+bundle_id = "reiss-tremolo"
+crate = "reiss-mcpherson-tremolo"
+category = "effect"
+fourcc = "RTrm"
+au3_subtype = "RTr3"
+au_tag = "Effects"
+aax_category = "Modulation"
+
+[[plugin]]
+name = "Reiss Ring Mod"
+bundle_id = "reiss-ringmod"
+crate = "reiss-mcpherson-ringmod"
+category = "effect"
+fourcc = "RRng"
+au3_subtype = "RRn3"
+au_tag = "Effects"
+aax_category = "Modulation"
+
+[[plugin]]
+name = "Reiss Compressor"
+bundle_id = "reiss-compressor"
+crate = "reiss-mcpherson-compressor"
+category = "effect"
+fourcc = "RCmp"
+au3_subtype = "RCm3"
+au_tag = "Dynamics"
+aax_category = "Dynamics"
+
+[[plugin]]
+name = "Reiss Distortion"
+bundle_id = "reiss-distortion"
+crate = "reiss-mcpherson-distortion"
+category = "effect"
+fourcc = "RDst"
+au3_subtype = "RDs3"
+au_tag = "Effects"
+aax_category = "Harmonic"
+
+[[plugin]]
+name = "Reiss Panning"
+bundle_id = "reiss-panning"
+crate = "reiss-mcpherson-panning"
+category = "effect"
+fourcc = "RPan"
+au3_subtype = "RPa3"
+au_tag = "Effects"
+aax_category = "Effect"

@@ -1,0 +1,53 @@
+[workspace]
+resolver = "2"
+members = [
+    "plugins/reiss-mcpherson-delay",
+    "plugins/reiss-mcpherson-vibrato",
+    "plugins/reiss-mcpherson-flanger",
+    "plugins/reiss-mcpherson-chorus",
+    "plugins/reiss-mcpherson-pingpong",
+    "plugins/reiss-mcpherson-parametric-eq",
+    "plugins/reiss-mcpherson-wahwah",
+    "plugins/reiss-mcpherson-phaser",
+    "plugins/reiss-mcpherson-tremolo",
+    "plugins/reiss-mcpherson-ringmod",
+    "plugins/reiss-mcpherson-compressor",
+    "plugins/reiss-mcpherson-distortion",
+    "plugins/reiss-mcpherson-panning",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0-or-later"
+rust-version = "1.92"
+
+# Point every truce-* crate at the sibling checkout. Versions match
+# the truce workspace at the time of writing.
+[workspace.dependencies]
+truce = { path = "../truce/crates/truce", default-features = false }
+truce-core = { path = "../truce/crates/truce-core" }
+truce-params = { path = "../truce/crates/truce-params" }
+truce-clap = { path = "../truce/crates/truce-clap" }
+truce-vst3 = { path = "../truce/crates/truce-vst3" }
+truce-au = { path = "../truce/crates/truce-au" }
+truce-standalone = { path = "../truce/crates/truce-standalone" }
+truce-gui = { path = "../truce/crates/truce-gui", default-features = false }
+truce-gui-types = { path = "../truce/crates/truce-gui-types" }
+truce-plugin = { path = "../truce/crates/truce-plugin" }
+truce-vst2 = { path = "../truce/crates/truce-vst2" }
+truce-lv2 = { path = "../truce/crates/truce-lv2" }
+truce-aax = { path = "../truce/crates/truce-aax" }
+truce-test = { path = "../truce/crates/truce-test" }
+truce-loader = { path = "../truce/crates/truce-loader" }
+truce-font = { path = "../truce/crates/truce-font" }
+clap-sys = "0.5"
+
+[workspace.lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("cargo-clippy"))'] }
+
+[workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+
+[profile.shell]
+inherits = "release"
