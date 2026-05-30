@@ -1,9 +1,9 @@
 # truce plugin project configuration for the Reiss / McPherson port.
 
 [vendor]
-name = "Reiss-McPherson"
-id = "com.reiss-mcpherson"
-url = "https://github.com/juandagilc/Audio-Effects"
+name = "Truce Audio"
+id = "com.truce.reiss-mcpherson"
+url = "https://github.com/truce-audio/reiss-mcpherson-effects"
 au_manufacturer = "Rmcp"
 
 [[plugin]]
@@ -135,3 +135,23 @@ fourcc = "RPan"
 au3_subtype = "RPa3"
 au_tag = "Effects"
 aax_category = "Effect"
+
+[[plugin]]
+name = "Reiss Robotization"
+bundle_id = "reiss-robotization"
+crate = "reiss-mcpherson-robotization"
+category = "effect"
+fourcc = "RRob"
+au3_subtype = "RRo3"
+au_tag = "Effects"
+aax_category = "Harmonic"
+
+[[plugin]]
+name = "Reiss Pitch Shift"
+bundle_id = "reiss-pitchshift"
+crate = "reiss-mcpherson-pitchshift"
+category = "effect"
+fourcc = "RPit"
+au3_subtype = "RPi3"
+au_tag = "Pitch"
+aax_category = "PitchShift"

@@ -14,6 +14,8 @@ members = [
     "plugins/reiss-mcpherson-compressor",
     "plugins/reiss-mcpherson-distortion",
     "plugins/reiss-mcpherson-panning",
+    "plugins/reiss-mcpherson-robotization",
+    "plugins/reiss-mcpherson-pitchshift",
 ]
 
 [workspace.package]
