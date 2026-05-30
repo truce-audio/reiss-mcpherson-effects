@@ -187,23 +187,23 @@ impl PluginLogic for Chorus {
         let stereo = self.params.stereo.value();
         #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         let num_voices = self.params.voices.value().clamp(2, 5) as usize;
+        let num_ch = buffer.channels().min(self.buffer.len());
 
-        let mut final_write = self.write_pos;
-        let mut final_phase = self.lfo_phase;
+        // Sample-outer / channel-inner: smoothers + shared LFO
+        // phase advance once per sample.
+        for i in 0..n {
+            let delay = self.params.delay.read();
+            let width = self.params.width.read();
+            let depth = self.params.depth.read();
+            let rate = self.params.rate.read();
+            let write = self.write_pos;
+            let ph = self.lfo_phase;
 
-        for ch in 0..buffer.channels().min(self.buffer.len()) {
-            let mut write = self.write_pos;
-            let mut ph = self.lfo_phase;
-            let (inp, out) = buffer.io(ch);
-            let line = &mut self.buffer[ch];
-
-            for i in 0..n {
-                let delay = self.params.delay.read();
-                let width = self.params.width.read();
-                let depth = self.params.depth.read();
-                let rate = self.params.rate.read();
-
+            for ch in 0..num_ch {
+                let (inp, out) = buffer.io(ch);
                 let in_sample = inp[i];
+                let line = &mut self.buffer[ch];
+
                 let mut acc = in_sample;
                 let mut phase_offset = 0.0_f32;
 
@@ -222,8 +222,7 @@ impl PluginLogic for Chorus {
                     let local_delay =
                         (delay + width * lfo(ph + phase_offset, waveform)) * self.sample_rate;
                     #[allow(clippy::cast_precision_loss)]
-                    let read_pos =
-                        (write as f32 - local_delay + buf_len_f).rem_euclid(buf_len_f);
+                    let read_pos = (write as f32 - local_delay + buf_len_f).rem_euclid(buf_len_f);
                     let voiced = sample_at(line, read_pos, buf_len, interp);
 
                     if stereo && num_voices == 2 {
@@ -249,22 +248,18 @@ impl PluginLogic for Chorus {
 
                 out[i] = acc;
                 line[write] = in_sample;
-                write += 1;
-                if write >= buf_len {
-                    write -= buf_len;
-                }
-                ph += rate / self.sample_rate;
-                if ph >= 1.0 {
-                    ph -= 1.0;
-                }
             }
 
-            final_write = write;
-            final_phase = ph;
+            self.write_pos += 1;
+            if self.write_pos >= buf_len {
+                self.write_pos -= buf_len;
+            }
+            self.lfo_phase += rate / self.sample_rate;
+            if self.lfo_phase >= 1.0 {
+                self.lfo_phase -= 1.0;
+            }
         }
 
-        self.write_pos = final_write;
-        self.lfo_phase = final_phase;
         ProcessStatus::Normal
     }
 

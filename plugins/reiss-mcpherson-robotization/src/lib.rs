@@ -259,6 +259,7 @@ impl Stft {
         let buf = &mut self.output_buffer[channel];
         let len = buf.len();
         let mut idx = self.output_write_pos;
+        #[allow(clippy::cast_precision_loss)]
         let inv_n = 1.0 / n as f32;
         for i in 0..n {
             // realfft's C2R is unnormalised - divide by N here so

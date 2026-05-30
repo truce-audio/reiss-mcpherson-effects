@@ -246,45 +246,42 @@ impl PluginLogic for WahWah {
         let n = buffer.num_samples();
         let mode = self.params.mode.value();
         let ty = self.params.filter_type.value();
-        let mut phase = self.lfo_phase;
-        let mut final_phase = phase;
+        let num_ch = buffer.channels().min(self.filters.len());
 
-        for ch in 0..buffer.channels().min(self.filters.len()) {
-            let (inp, out) = buffer.io(ch);
-            let mut env = self.envelopes[ch];
-            phase = self.lfo_phase;
+        // Sample-outer / channel-inner: smoothers + LFO phase
+        // advance once per sample. Envelope follower stays per-
+        // channel (peak detection on each channel's own input).
+        for i in 0..n {
+            let mix = self.params.mix.read();
+            let attack = attack_release_coeff(self.params.env_attack.read(), self.inv_sr);
+            let release = attack_release_coeff(self.params.env_release.read(), self.inv_sr);
+            let lfo_rate = self.params.lfo_rate.read();
+            let lfo_env_mix = self.params.lfo_env_mix.read();
+            let manual_freq = self.params.frequency.read();
+            let q = f64::from(self.params.q.read());
+            let gain_lin = 10f64.powf(f64::from(self.params.gain.read()) * 0.05);
 
-            for i in 0..n {
-                let mix = self.params.mix.read();
-                let attack = attack_release_coeff(self.params.env_attack.read(), self.inv_sr);
-                let release = attack_release_coeff(self.params.env_release.read(), self.inv_sr);
-                let lfo_rate = self.params.lfo_rate.read();
-                let lfo_env_mix = self.params.lfo_env_mix.read();
-
-                let abs_in = inp[i].abs();
+            for ch in 0..num_ch {
+                let in_sample = buffer.io(ch).0[i];
+                let abs_in = in_sample.abs();
+                let mut env = self.envelopes[ch];
                 env = if abs_in > env {
                     attack * env + (1.0 - attack) * abs_in
                 } else {
                     release * env + (1.0 - release) * abs_in
                 };
+                self.envelopes[ch] = env;
 
                 let centre_freq_hz = match mode {
-                    Mode::Manual => self.params.frequency.read(),
+                    Mode::Manual => manual_freq,
                     Mode::Automatic => {
-                        let lfo_norm = 0.5
-                            + 0.5 * (std::f32::consts::TAU * phase).sin();
+                        let lfo_norm = 0.5 + 0.5 * (std::f32::consts::TAU * self.lfo_phase).sin();
                         let env_norm = env.clamp(0.0, 1.0);
                         let mixed = lfo_norm + lfo_env_mix * (env_norm - lfo_norm);
-                        phase += lfo_rate * self.inv_sr;
-                        if phase >= 1.0 {
-                            phase -= 1.0;
-                        }
                         MIN_HZ + mixed * (MAX_HZ - MIN_HZ)
                     }
                 };
 
-                let q = f64::from(self.params.q.read());
-                let gain_lin = 10f64.powf(f64::from(self.params.gain.read()) * 0.05);
                 update(
                     &mut self.filters[ch],
                     f64::from(centre_freq_hz),
@@ -294,19 +291,19 @@ impl PluginLogic for WahWah {
                     self.sample_rate,
                 );
 
-                let in_sample = inp[i];
                 #[allow(clippy::cast_possible_truncation)]
                 let filtered = self.filters[ch].process(f64::from(in_sample)) as f32;
-                out[i] = in_sample + mix * (filtered - in_sample);
+                buffer.io(ch).1[i] = in_sample + mix * (filtered - in_sample);
             }
 
-            self.envelopes[ch] = env;
-            if ch == 0 {
-                final_phase = phase;
+            if matches!(mode, Mode::Automatic) {
+                self.lfo_phase += lfo_rate * self.inv_sr;
+                if self.lfo_phase >= 1.0 {
+                    self.lfo_phase -= 1.0;
+                }
             }
         }
 
-        self.lfo_phase = final_phase;
         ProcessStatus::Normal
     }
 

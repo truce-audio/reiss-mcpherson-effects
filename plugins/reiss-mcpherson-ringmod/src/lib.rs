@@ -126,28 +126,26 @@ impl PluginLogic for RingMod {
     ) -> ProcessStatus {
         let n = buffer.num_samples();
         let waveform = self.params.waveform.value();
-        let mut phase_main = self.lfo_phase;
+        let num_ch = buffer.channels();
 
-        for ch in 0..buffer.channels() {
-            let (inp, out) = buffer.io(ch);
-            let mut phase = self.lfo_phase;
-            for i in 0..n {
-                let depth = self.params.depth.read();
-                let freq = self.params.frequency.read();
-                // Bipolar carrier in [-1, 1]; depth crossfades from
-                // dry (depth=0) to fully modulated (depth=1).
-                let carrier = 2.0 * lfo(phase, waveform) - 1.0;
-                out[i] = inp[i] * (1.0 - depth + depth * carrier);
-                phase += freq * self.inv_sr;
-                if phase >= 1.0 {
-                    phase -= 1.0;
-                }
+        // Sample-outer / channel-inner: smoothers + carrier phase
+        // advance once per sample, applied to every channel.
+        for i in 0..n {
+            let depth = self.params.depth.read();
+            let freq = self.params.frequency.read();
+            // Bipolar carrier in [-1, 1]; depth crossfades from
+            // dry (depth=0) to fully modulated (depth=1).
+            let carrier = 2.0 * lfo(self.lfo_phase, waveform) - 1.0;
+            let gain = 1.0 - depth + depth * carrier;
+            for ch in 0..num_ch {
+                let (inp, out) = buffer.io(ch);
+                out[i] = inp[i] * gain;
             }
-            if ch == 0 {
-                phase_main = phase;
+            self.lfo_phase += freq * self.inv_sr;
+            if self.lfo_phase >= 1.0 {
+                self.lfo_phase -= 1.0;
             }
         }
-        self.lfo_phase = phase_main;
         ProcessStatus::Normal
     }
 

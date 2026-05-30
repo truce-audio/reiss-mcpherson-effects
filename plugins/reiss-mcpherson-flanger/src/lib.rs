@@ -164,46 +164,51 @@ impl PluginLogic for Flanger {
         let waveform = self.params.waveform.value();
         let interp = self.params.interp.value();
         let stereo = self.params.stereo.value();
-        let inverted = self.params.inverted.value();
-        let invert = if inverted { -1.0_f32 } else { 1.0 };
+        let invert = if self.params.inverted.value() {
+            -1.0_f32
+        } else {
+            1.0
+        };
+        let num_ch = buffer.channels().min(self.buffer.len());
 
-        let mut final_write = self.write_pos;
-        let mut final_phase = self.lfo_phase;
+        // Sample-outer / channel-inner: smoothers + LFO phase
+        // advance once per sample. Stereo LFO offset (0.25) is
+        // applied per channel from the shared phase, so both
+        // channels still get an in-quadrature sweep without
+        // double-stepping the smoother.
+        for i in 0..n {
+            let delay = self.params.delay.read();
+            let width = self.params.width.read();
+            let depth = self.params.depth.read();
+            let feedback = self.params.feedback.read();
+            let rate = self.params.rate.read();
+            let write = self.write_pos;
 
-        for ch in 0..buffer.channels().min(self.buffer.len()) {
-            let mut write = self.write_pos;
-            let mut ph = self.lfo_phase;
-            if stereo && ch != 0 {
-                ph = (ph + 0.25).rem_euclid(1.0);
-            }
-            let (inp, out) = buffer.io(ch);
-            let line = &mut self.buffer[ch];
-
-            for i in 0..n {
-                let delay = self.params.delay.read();
-                let width = self.params.width.read();
-                let depth = self.params.depth.read();
-                let feedback = self.params.feedback.read();
-                let rate = self.params.rate.read();
-                let delay_samples =
-                    (delay + width * lfo(ph, waveform)) * self.sample_rate;
+            for ch in 0..num_ch {
+                let ph = if stereo && ch != 0 {
+                    (self.lfo_phase + 0.25).rem_euclid(1.0)
+                } else {
+                    self.lfo_phase
+                };
+                let delay_samples = (delay + width * lfo(ph, waveform)) * self.sample_rate;
 
                 #[allow(clippy::cast_precision_loss)]
-                let read_pos =
-                    (write as f32 - delay_samples + buf_len_f).rem_euclid(buf_len_f);
+                let read_pos = (write as f32 - delay_samples + buf_len_f).rem_euclid(buf_len_f);
                 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
                 let r0 = read_pos.floor() as usize % buf_len;
+                let frac = read_pos - read_pos.floor();
 
+                let (inp, out) = buffer.io(ch);
+                let in_sample = inp[i];
+                let line = &mut self.buffer[ch];
                 let delayed = match interp {
                     Interpolation::Nearest => line[r0],
                     Interpolation::Linear => {
-                        let frac = read_pos - read_pos.floor();
                         let s0 = line[r0];
                         let s1 = line[(r0 + 1) % buf_len];
                         s0 + frac * (s1 - s0)
                     }
                     Interpolation::Cubic => {
-                        let frac = read_pos - read_pos.floor();
                         let f2 = frac * frac;
                         let f3 = f2 * frac;
                         let s0 = line[(r0 + buf_len - 1) % buf_len];
@@ -216,29 +221,20 @@ impl PluginLogic for Flanger {
                         a0 * f3 + a1 * f2 + a2 * frac + s1
                     }
                 };
-
-                let in_sample = inp[i];
                 out[i] = in_sample + delayed * depth * invert;
                 line[write] = in_sample + delayed * feedback;
-
-                write += 1;
-                if write >= buf_len {
-                    write -= buf_len;
-                }
-                ph += rate / self.sample_rate;
-                if ph >= 1.0 {
-                    ph -= 1.0;
-                }
             }
 
-            if ch == 0 {
-                final_phase = ph;
+            self.write_pos += 1;
+            if self.write_pos >= buf_len {
+                self.write_pos -= buf_len;
             }
-            final_write = write;
+            self.lfo_phase += rate / self.sample_rate;
+            if self.lfo_phase >= 1.0 {
+                self.lfo_phase -= 1.0;
+            }
         }
 
-        self.write_pos = final_write;
-        self.lfo_phase = final_phase;
         ProcessStatus::Normal
     }
 

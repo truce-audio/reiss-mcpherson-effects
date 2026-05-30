@@ -132,36 +132,36 @@ impl PluginLogic for Vibrato {
         let buf_len_f = buf_len as f32;
         let waveform = self.params.waveform.value();
         let interp = self.params.interp.value();
-        let mut phase = self.lfo_phase;
-        let mut final_write = self.write_pos;
+        let num_ch = buffer.channels().min(self.buffer.len());
 
-        for ch in 0..buffer.channels().min(self.buffer.len()) {
-            let mut write = self.write_pos;
-            let mut ph = phase;
-            let (inp, out) = buffer.io(ch);
-            let line = &mut self.buffer[ch];
+        // Sample-outer / channel-inner: smoothers (and the shared
+        // LFO phase) advance once per sample, not once per channel
+        // per sample.
+        for i in 0..n {
+            let width = self.params.width.read();
+            let rate = self.params.rate.read();
+            let phase = self.lfo_phase;
+            let delay_samples = width * lfo(phase, waveform) * self.sample_rate;
+            let write = self.write_pos;
 
-            for i in 0..n {
-                let width = self.params.width.read();
-                let rate = self.params.rate.read();
-                let delay_samples = width * lfo(ph, waveform) * self.sample_rate;
+            #[allow(clippy::cast_precision_loss)]
+            let read_pos = (write as f32 - delay_samples + buf_len_f - 1.0).rem_euclid(buf_len_f);
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+            let r0 = read_pos.floor() as usize % buf_len;
+            let frac = read_pos - read_pos.floor();
 
-                #[allow(clippy::cast_precision_loss)]
-                let read_pos =
-                    (write as f32 - delay_samples + buf_len_f - 1.0).rem_euclid(buf_len_f);
-                #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-                let r0 = read_pos.floor() as usize % buf_len;
-
+            for ch in 0..num_ch {
+                let (inp, out) = buffer.io(ch);
+                let in_sample = inp[i];
+                let line = &mut self.buffer[ch];
                 let out_sample = match interp {
                     Interpolation::Nearest => line[r0],
                     Interpolation::Linear => {
-                        let frac = read_pos - read_pos.floor();
                         let s0 = line[r0];
                         let s1 = line[(r0 + 1) % buf_len];
                         s0 + frac * (s1 - s0)
                     }
                     Interpolation::Cubic => {
-                        let frac = read_pos - read_pos.floor();
                         let f2 = frac * frac;
                         let f3 = f2 * frac;
                         let s0 = line[(r0 + buf_len - 1) % buf_len];
@@ -174,26 +174,20 @@ impl PluginLogic for Vibrato {
                         a0 * f3 + a1 * f2 + a2 * frac + s1
                     }
                 };
-
-                line[write] = inp[i];
+                line[write] = in_sample;
                 out[i] = out_sample;
-
-                write += 1;
-                if write >= buf_len {
-                    write -= buf_len;
-                }
-                ph += rate / self.sample_rate;
-                if ph >= 1.0 {
-                    ph -= 1.0;
-                }
             }
 
-            final_write = write;
-            phase = ph;
+            self.write_pos += 1;
+            if self.write_pos >= buf_len {
+                self.write_pos -= buf_len;
+            }
+            self.lfo_phase += rate / self.sample_rate;
+            if self.lfo_phase >= 1.0 {
+                self.lfo_phase -= 1.0;
+            }
         }
 
-        self.write_pos = final_write;
-        self.lfo_phase = phase;
         ProcessStatus::Normal
     }
 

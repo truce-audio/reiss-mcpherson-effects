@@ -165,19 +165,24 @@ impl PluginLogic for Distortion {
         // Re-derive shelf coefficients once per block - tone is
         // smoothed but recomputing per-sample buys nothing audible
         // at this cut-off.
-        let tone = self.params.tone.read();
+        // `read_after(n)` advances the smoother by the whole block;
+        // recomputing the shelf at sample rate buys nothing audible
+        // at PI*0.01 cut-off but starving the smoother would.
+        let tone = self.params.tone.read_after(n);
         for s in &mut self.shelves {
             s.update(tone);
         }
 
-        for ch in 0..buffer.channels().min(self.shelves.len()) {
-            let (inp, out) = buffer.io(ch);
-            let s = &mut self.shelves[ch];
-            for i in 0..n {
-                let in_gain = 10f32.powf(self.params.input_gain.read() * 0.05);
-                let out_gain = 10f32.powf(self.params.output_gain.read() * 0.05);
+        let num_ch = buffer.channels().min(self.shelves.len());
+        // Sample-outer / channel-inner: smoothed gain reads happen
+        // once per sample, applied across all channels.
+        for i in 0..n {
+            let in_gain = 10f32.powf(self.params.input_gain.read() * 0.05);
+            let out_gain = 10f32.powf(self.params.output_gain.read() * 0.05);
+            for ch in 0..num_ch {
+                let (inp, out) = buffer.io(ch);
                 let shaped = shape(inp[i] * in_gain, ty);
-                let filtered = s.process(shaped);
+                let filtered = self.shelves[ch].process(shaped);
                 out[i] = filtered * out_gain;
             }
         }

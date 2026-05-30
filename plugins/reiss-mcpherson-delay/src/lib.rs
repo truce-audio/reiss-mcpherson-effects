@@ -85,46 +85,45 @@ impl PluginLogic for Delay {
         let buf_len = self.buffer_len;
         #[allow(clippy::cast_precision_loss)]
         let buf_len_f = buf_len as f32;
+        let num_ch = buffer.channels().min(self.buffer.len());
 
-        for ch in 0..buffer.channels().min(self.buffer.len()) {
-            let mut write = self.write_pos;
-            let (inp, out) = buffer.io(ch);
-            let line = &mut self.buffer[ch];
+        // Sample-outer / channel-inner so each smoothed param is
+        // read exactly once per sample - reading inside the channel
+        // loop would advance the smoother N × num_channels times
+        // per block.
+        for i in 0..n {
+            let delay_secs = self.params.delay_time.read();
+            let feedback = self.params.feedback.read();
+            let mix = self.params.mix.read();
+            let delay_samples = delay_secs * self.sample_rate;
+            let write = self.write_pos;
 
-            for i in 0..n {
-                let delay_secs = self.params.delay_time.read();
-                let feedback = self.params.feedback.read();
-                let mix = self.params.mix.read();
-                let delay_samples = delay_secs * self.sample_rate;
+            #[allow(clippy::cast_precision_loss)]
+            let read_pos = (write as f32 - delay_samples + buf_len_f).rem_euclid(buf_len_f);
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+            let read_idx = read_pos.floor() as usize;
+            let frac = read_pos - read_pos.floor();
 
-                #[allow(clippy::cast_precision_loss)]
-                let read_pos = (write as f32 - delay_samples + buf_len_f).rem_euclid(buf_len_f);
-                #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-                let read_idx = read_pos.floor() as usize;
-
+            for ch in 0..num_ch {
+                let (inp, out) = buffer.io(ch);
                 let in_sample = inp[i];
-                if read_idx != write {
-                    let frac = read_pos - read_pos.floor();
+                let line = &mut self.buffer[ch];
+                if read_idx == write {
+                    out[i] = in_sample;
+                    line[write] = in_sample;
+                } else {
                     let d0 = line[read_idx];
                     let d1 = line[(read_idx + 1) % buf_len];
                     let delayed = d0 + frac * (d1 - d0);
-
                     out[i] = in_sample + mix * (delayed - in_sample);
                     line[write] = in_sample + delayed * feedback;
-                } else {
-                    out[i] = in_sample;
-                    line[write] = in_sample;
-                }
-
-                write += 1;
-                if write >= buf_len {
-                    write -= buf_len;
                 }
             }
 
-            // Last channel processed writes back the canonical
-            // position so all channels share the same write head.
-            self.write_pos = write;
+            self.write_pos += 1;
+            if self.write_pos >= buf_len {
+                self.write_pos -= buf_len;
+            }
         }
 
         ProcessStatus::Normal

@@ -184,7 +184,7 @@ struct PhaseVocoder {
     need_phase_reset: bool,
 
     /// Resampling / synthesis-window scratch. Length grows with
-    /// `1 / ratio` (up to ~2x fft_size at -12 semitones).
+    /// `1 / ratio` (up to ~2x `fft_size` at -12 semitones).
     resampled: Vec<f32>,
     synthesis_window: Vec<f32>,
 }
@@ -277,10 +277,7 @@ impl PhaseVocoder {
             self.samples_since_last_fft = 0;
             self.need_phase_reset = true;
         }
-        if size_changed
-            || overlap != self.overlap
-            || window_type as u8 != self.window_type as u8
-        {
+        if size_changed || overlap != self.overlap || window_type as u8 != self.window_type as u8 {
             build_window(window_type, fft_size, &mut self.fft_window);
             self.window_scale = window_scale(&self.fft_window, overlap);
             self.hop_size = fft_size / overlap.max(1);
@@ -350,11 +347,15 @@ impl PluginLogic for PitchShift {
         // recipe — guarantees the per-bin phase increment is an
         // integer multiple of the FFT bin spacing, eliminating
         // long-running phase drift between successive hops.
-        let shift_st = self.params.shift.read();
+        let shift_st = self.params.shift.read_after(n);
         let raw_factor = 2f32.powf(shift_st / 12.0);
         let ratio = (raw_factor * hop_f).round() / hop_f;
         let ratio = ratio.max(1e-3);
-        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        #[allow(
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss,
+            clippy::cast_precision_loss,
+        )]
         let resampled_len = ((fft_size as f32) / ratio).floor() as usize;
         let resampled_len = resampled_len.min(pv.output_len);
 

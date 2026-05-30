@@ -119,7 +119,10 @@ impl PluginLogic for PingPong {
             let in_left = (1.0 - balance) * frame_in[0];
             let in_right = balance * frame_in[1];
 
-            if r0 != write {
+            if r0 == write {
+                frame_out[0] = in_left;
+                frame_out[1] = in_right;
+            } else {
                 let frac = read_pos - read_pos.floor();
                 let dl0 = line_l[r0];
                 let dl1 = line_l[(r0 + 1) % buf_len];
@@ -133,9 +136,6 @@ impl PluginLogic for PingPong {
                 // The cross-feed (R into L's line) is the ping-pong.
                 line_l[write] = in_left + del_r * feedback;
                 line_r[write] = in_right + del_l * feedback;
-            } else {
-                frame_out[0] = in_left;
-                frame_out[1] = in_right;
             }
 
             write += 1;

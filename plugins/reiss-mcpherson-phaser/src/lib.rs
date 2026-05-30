@@ -207,54 +207,52 @@ impl PluginLogic for Phaser {
         let waveform = self.params.waveform.value();
         let stereo = self.params.stereo.value();
         let num_filters = self.params.stages.value().count();
+        let num_ch = buffer.channels().min(self.filters.len());
 
-        let mut counter = self.sample_counter;
-        let mut phase_main = self.lfo_phase;
+        // Sample-outer / channel-inner: smoothers + shared
+        // sample_counter + shared lfo_phase advance once per sample,
+        // applied across both channels (with stereo phase offset
+        // computed per-channel from the shared phase).
+        for i in 0..n {
+            let depth = self.params.depth.read();
+            let feedback = self.params.feedback.read();
+            let min_f = self.params.min_freq.read();
+            let sweep = self.params.sweep_width.read();
+            let rate = self.params.lfo_rate.read();
+            let update_filters = self.sample_counter.is_multiple_of(UPDATE_INTERVAL);
 
-        for ch in 0..buffer.channels().min(self.filters.len()) {
-            let (inp, out) = buffer.io(ch);
-            let mut phase = self.lfo_phase;
-            if stereo && ch != 0 {
-                phase = (phase + 0.25).rem_euclid(1.0);
-            }
-            counter = self.sample_counter;
-
-            for i in 0..n {
-                let depth = self.params.depth.read();
-                let feedback = self.params.feedback.read();
-                let min_f = self.params.min_freq.read();
-                let sweep = self.params.sweep_width.read();
-                let rate = self.params.lfo_rate.read();
-
+            for ch in 0..num_ch {
+                let phase = if stereo && ch != 0 {
+                    (self.lfo_phase + 0.25).rem_euclid(1.0)
+                } else {
+                    self.lfo_phase
+                };
                 let centre = min_f + sweep * lfo(phase, waveform);
-                phase += rate * self.inv_sr;
-                if phase >= 1.0 {
-                    phase -= 1.0;
-                }
 
-                if counter % UPDATE_INTERVAL == 0 {
+                if update_filters {
                     let discrete = std::f32::consts::TAU * centre * self.inv_sr;
                     for filter in &mut self.filters[ch][..num_filters] {
                         filter.update(discrete);
                     }
                 }
-                counter = counter.wrapping_add(1);
 
-                let mut filtered = inp[i] + feedback * self.feedback_state[ch];
+                let (inp, out) = buffer.io(ch);
+                let in_sample = inp[i];
+                let mut filtered = in_sample + feedback * self.feedback_state[ch];
                 for filter in &mut self.filters[ch][..num_filters] {
                     filtered = filter.process(filtered);
                 }
                 self.feedback_state[ch] = filtered;
-                out[i] = inp[i] + depth * (filtered - inp[i]) * 0.5;
+                out[i] = in_sample + depth * (filtered - in_sample) * 0.5;
             }
 
-            if ch == 0 {
-                phase_main = phase;
+            self.sample_counter = self.sample_counter.wrapping_add(1);
+            self.lfo_phase += rate * self.inv_sr;
+            if self.lfo_phase >= 1.0 {
+                self.lfo_phase -= 1.0;
             }
         }
 
-        self.lfo_phase = phase_main;
-        self.sample_counter = counter;
         ProcessStatus::Normal
     }
 

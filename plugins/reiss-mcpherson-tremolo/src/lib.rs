@@ -127,26 +127,24 @@ impl PluginLogic for Tremolo {
     ) -> ProcessStatus {
         let n = buffer.num_samples();
         let waveform = self.params.waveform.value();
-        let mut phase_main = self.lfo_phase;
+        let num_ch = buffer.channels();
 
-        for ch in 0..buffer.channels() {
-            let (inp, out) = buffer.io(ch);
-            let mut phase = self.lfo_phase;
-            for i in 0..n {
-                let depth = self.params.depth.read();
-                let rate = self.params.rate.read();
-                let modulation = lfo(phase, waveform);
-                out[i] = inp[i] * (1.0 - depth + depth * modulation);
-                phase += rate * self.inv_sr;
-                if phase >= 1.0 {
-                    phase -= 1.0;
-                }
+        // Sample-outer / channel-inner: smoothers + LFO advance
+        // once per sample, applied to every channel.
+        for i in 0..n {
+            let depth = self.params.depth.read();
+            let rate = self.params.rate.read();
+            let modulation = lfo(self.lfo_phase, waveform);
+            let gain = 1.0 - depth + depth * modulation;
+            for ch in 0..num_ch {
+                let (inp, out) = buffer.io(ch);
+                out[i] = inp[i] * gain;
             }
-            if ch == 0 {
-                phase_main = phase;
+            self.lfo_phase += rate * self.inv_sr;
+            if self.lfo_phase >= 1.0 {
+                self.lfo_phase -= 1.0;
             }
         }
-        self.lfo_phase = phase_main;
         ProcessStatus::Normal
     }
 

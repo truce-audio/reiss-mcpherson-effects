@@ -1,3 +1,9 @@
+// Default Q is √2 (Butterworth). The `Params` derive expands the
+// `default = 1.4142...` literal into the generated init code, where
+// clippy can no longer see the attribute on the struct - allow at
+// the crate root so the macro-expanded literal stays clean.
+#![allow(clippy::approx_constant)]
+
 //! Parametric EQ - single-band selectable filter.
 
 use std::sync::Arc;
@@ -213,9 +219,12 @@ impl PluginLogic for ParametricEq {
         // JUCE source updates them inside parameter setters, never on
         // smoothed values. Smoothing the parameter just animates the
         // host-side value; the filter snaps at block boundaries.
-        let freq = f64::from(self.params.frequency.read());
-        let q = f64::from(self.params.q.read());
-        let gain_db = f64::from(self.params.gain.read());
+        // `read_after(n)` advances the smoother by the whole block so a
+        // knob sweep reaches its target at the documented time even
+        // though the biquad rebuilds only at block boundaries.
+        let freq = f64::from(self.params.frequency.read_after(n));
+        let q = f64::from(self.params.q.read_after(n));
+        let gain_db = f64::from(self.params.gain.read_after(n));
         #[allow(clippy::cast_possible_truncation)]
         let ty_idx = ty as i32;
 

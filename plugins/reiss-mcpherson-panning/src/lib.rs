@@ -61,8 +61,7 @@ impl Delay {
         #[allow(clippy::cast_precision_loss)]
         let len_f = len as f32;
         #[allow(clippy::cast_precision_loss)]
-        let read_pos =
-            (self.write as f32 - 1.0 - delay_samples + len_f).rem_euclid(len_f);
+        let read_pos = (self.write as f32 - 1.0 - delay_samples + len_f).rem_euclid(len_f);
         #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         let idx = read_pos.floor() as usize % len;
         let frac = read_pos - read_pos.floor();
@@ -156,42 +155,38 @@ impl PluginLogic for Panning {
         #[allow(clippy::cast_precision_loss)]
         let max_delay_f = self.max_delay_samples as f32;
         let sr = self.sample_rate;
-        let pan = self.params.pan.read();
+        let hp = std::f32::consts::FRAC_PI_2;
 
         match method {
             Method::PanoramaPrecedence => {
+                // theta is fixed at 30° so its sin/cos hoist out;
+                // phi tracks the smoothed pan per sample.
                 let theta = 30.0_f32.to_radians();
-                let phi = -pan * theta;
                 let (st, ct) = theta.sin_cos();
-                let (sp, cp) = phi.sin_cos();
-                let gain_l = cp * st + sp * ct;
-                let gain_r = cp * st - sp * ct;
-                let norm = 1.0 / (gain_l * gain_l + gain_r * gain_r).sqrt();
-                let delay_factor = (pan + 1.0) * 0.5;
-                let delay_l = max_delay_f * delay_factor;
-                let delay_r = max_delay_f * (1.0 - delay_factor);
-
-                let (left, right) = buffer.io_pair(0, 0);
-                // io_pair gives us &[input] / &mut [output] for the same
-                // channel; for a stereo split we need two passes.
-                let _ = (left, right);
                 for i in 0..n {
+                    let pan = self.params.pan.read();
+                    let phi = -pan * theta;
+                    let (sp, cp) = phi.sin_cos();
+                    let gain_l = cp * st + sp * ct;
+                    let gain_r = cp * st - sp * ct;
+                    let norm = 1.0 / (gain_l * gain_l + gain_r * gain_r).sqrt();
+                    let delay_factor = (pan + 1.0) * 0.5;
+                    let delay_l = max_delay_f * delay_factor;
+                    let delay_r = max_delay_f * (1.0 - delay_factor);
+
                     let in_sample = buffer.io(0).0[i];
                     self.delay_l.write(in_sample);
                     self.delay_r.write(in_sample);
-                    let dl = self.delay_l.read(delay_l) * gain_l * norm;
-                    let dr = self.delay_r.read(delay_r) * gain_r * norm;
-                    buffer.io(0).1[i] = dl;
-                    buffer.io(1).1[i] = dr;
+                    buffer.io(0).1[i] = self.delay_l.read(delay_l) * gain_l * norm;
+                    buffer.io(1).1[i] = self.delay_r.read(delay_r) * gain_r * norm;
                 }
             }
             Method::ItdIld => {
                 let head_radius = 8.5e-2_f32;
                 let speed_of_sound = 340.0_f32;
                 let head_factor = sr * head_radius / speed_of_sound;
+                let head_factor_shelf = head_radius / speed_of_sound;
                 let theta = 90.0_f32.to_radians();
-                let phi = pan * theta;
-                let hp = std::f32::consts::FRAC_PI_2;
                 let td = |angle: f32| -> f32 {
                     if angle.abs() < hp {
                         head_factor * (1.0 - angle.cos())
@@ -199,13 +194,15 @@ impl PluginLogic for Panning {
                         head_factor * (angle.abs() + 1.0 - hp)
                     }
                 };
-                let d_l = td(phi + hp);
-                let d_r = td(phi - hp);
-
-                self.filter_l.update(phi + hp, head_radius / speed_of_sound);
-                self.filter_r.update(phi - hp, head_radius / speed_of_sound);
 
                 for i in 0..n {
+                    let pan = self.params.pan.read();
+                    let phi = pan * theta;
+                    let d_l = td(phi + hp);
+                    let d_r = td(phi - hp);
+                    self.filter_l.update(phi + hp, head_factor_shelf);
+                    self.filter_r.update(phi - hp, head_factor_shelf);
+
                     let in_sample = buffer.io(0).0[i];
                     self.delay_l.write(in_sample);
                     self.delay_r.write(in_sample);
