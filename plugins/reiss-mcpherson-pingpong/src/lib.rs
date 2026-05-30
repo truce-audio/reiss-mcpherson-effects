@@ -1,7 +1,5 @@
 //! Ping-Pong Delay - stereo delay where the feedback path crosses
 //! channels so each repeat bounces L <-> R.
-//!
-//! Ported from Juan Gil's "Audio Effects" Ping-Pong Delay.
 
 use std::sync::Arc;
 use truce::prelude::*;

@@ -1,10 +1,4 @@
 //! Parametric EQ - single-band selectable filter.
-//!
-//! Ported from Juan Gil's "Audio Effects" Parametric EQ. Implements
-//! seven filter shapes from the book (first-order LP/HP/LS/HS plus
-//! second-order BP/BS/Peak). Coefficients map JUCE's
-//! `b0 + b1 z^-1 + b2 z^-2 / a0 + a1 z^-1 + a2 z^-2` form directly,
-//! normalised by a0 at evaluation time.
 
 use std::sync::Arc;
 use truce::prelude::*;

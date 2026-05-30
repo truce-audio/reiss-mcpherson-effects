@@ -29,19 +29,8 @@ Each plugin builds as CLAP / VST3 / VST2 / LV2 / AU / AAX / Standalone.
 
 ## Build
 
-    cargo build --workspace --release        # all formats, all plugins
-    cargo test  --workspace                  # framework smoke + plugin tests
-    cargo run --bin reiss-mcpherson-delay-standalone --release
-
-`cargo truce install <plugin>` packages and installs individual
-plugins; see the truce docs for format-specific options.
-
-## Layout
-
-    Cargo.toml          workspace + truce 0.49 deps
-    .cargo/config.toml  signing identities, AAX SDK path
-    truce.toml          per-plugin bundle IDs, AU/AAX codes, categories
-    plugins/<name>/     one crate per effect
+See the [truce repo](https://github.com/truce-audio/truce) for
+build, install and packaging instructions.
 
 ## Licensing
 

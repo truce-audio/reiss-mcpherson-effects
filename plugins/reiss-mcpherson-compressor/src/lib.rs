@@ -1,9 +1,6 @@
 //! Compressor / Expander - dynamics processor with four modes
 //! (compressor / limiter / expander / noise gate) selected via the
 //! Mode dropdown plus Ratio.
-//!
-//! Ported from Juan Gil's "Audio Effects" Compressor/Expander.
-//! Detection runs on a mono-mixdown of the input.
 
 use std::sync::Arc;
 use truce::prelude::*;

@@ -1,7 +1,5 @@
 //! Ring Modulation - multiplies the input signal by a periodic
 //! carrier.
-//!
-//! Ported from Juan Gil's "Audio Effects" Ring Modulation.
 
 use std::sync::Arc;
 use truce::prelude::*;

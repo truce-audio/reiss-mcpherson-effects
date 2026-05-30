@@ -1,7 +1,4 @@
 //! Flanger - short modulated delay summed with the dry signal.
-//!
-//! Ported from Juan Gil's "Audio Effects" Flanger. The delay time
-//! sweeps between `Delay` and `Delay + Width` driven by an LFO.
 
 use std::sync::Arc;
 use truce::prelude::*;

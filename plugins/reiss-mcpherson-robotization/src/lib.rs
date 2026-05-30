@@ -2,11 +2,6 @@
 //! either zeroes the per-bin phase (robotization → constant-pitch
 //! voice) or randomises it (whisperization → noisy unpitched voice).
 //!
-//! Ported from Juan Gil's "Audio Effects" Robotization-Whisperization
-//! (Reiss / McPherson chapter on phase-vocoder effects). Uses
-//! [`realfft`] for the FFT and [`apodize`] for the Hann/Hamming
-//! windows; the per-bin random phase comes from [`fastrand`].
-//!
 //! FFT size, hop-ratio and window type are all switchable at
 //! runtime — when the host changes one, `process` rebuilds the
 //! plans on the next block. That allocates on the audio thread,

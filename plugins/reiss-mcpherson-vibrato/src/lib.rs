@@ -1,9 +1,4 @@
 //! Vibrato - LFO-modulated delay producing periodic pitch variation.
-//!
-//! Ported from Juan Gil's "Audio Effects" Vibrato. The read head
-//! sweeps through a short delay line at LFO rate; the resulting
-//! Doppler shift is the vibrato. Three interpolation modes are
-//! exposed (nearest / linear / cubic).
 
 use std::sync::Arc;
 use truce::prelude::*;

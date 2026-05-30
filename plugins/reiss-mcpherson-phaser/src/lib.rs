@@ -1,12 +1,5 @@
 //! Phaser - cascade of first-order allpass filters whose centre
 //! frequency is swept by an LFO.
-//!
-//! Ported from Juan Gil's "Audio Effects" Phaser. The allpass form
-//! is the one from the book:
-//!   `b0 = tan(wc/2) - 1, b1 = tan(wc/2) + 1`
-//!   `a0 = tan(wc/2) + 1, a1 = tan(wc/2) - 1`
-//! Coefficients are updated every `UPDATE_INTERVAL` samples to keep
-//! the audio thread off `tan()` on every sample.
 
 use std::sync::Arc;
 use truce::prelude::*;

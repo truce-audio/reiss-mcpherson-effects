@@ -1,9 +1,5 @@
 //! Wah-Wah - resonant filter whose centre frequency is moved by an
 //! LFO, an input envelope follower, or a manual slider.
-//!
-//! Ported from Juan Gil's "Audio Effects" Wah-Wah. Three filter
-//! shapes are exposed (resonant LP, BP, peaking) — the coefficients
-//! come directly from the book.
 
 use std::sync::Arc;
 use truce::prelude::*;

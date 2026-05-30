@@ -1,11 +1,5 @@
 //! Pitch Shift - real-time phase-vocoder pitch shifter.
 //!
-//! Ported from Juan Gil's "Audio Effects" Pitch Shift (Reiss /
-//! McPherson chapter on phase-vocoder effects). Time-domain
-//! resampling between the IFFT output and the synthesis window
-//! gives the pitch shift; per-bin phase tracking keeps the
-//! reconstructed signal phase-coherent across hops.
-//!
 //! Uses [`realfft`] for the FFT and [`apodize`] for Hann / Hamming
 //! windows. FFT size, hop ratio and window type are all live
 //! parameters; switching them rebuilds the plans on the next

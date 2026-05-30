@@ -1,9 +1,4 @@
 //! Distortion - waveshaper plus a tone-control high-shelf.
-//!
-//! Ported from Juan Gil's "Audio Effects" Distortion. Five shaping
-//! curves match the original (hard / soft clip, exponential, full /
-//! half wave rectifier); the post-shaper high-shelf uses the same
-//! first-order coefficient form as the book's tone shelf.
 
 use std::sync::Arc;
 use truce::prelude::*;

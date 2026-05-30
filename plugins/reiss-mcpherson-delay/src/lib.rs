@@ -1,7 +1,4 @@
 //! Basic delay with feedback and mix using a circular delay line.
-//!
-//! Ported from Juan Gil's "Audio Effects" Delay (chapter from Reiss /
-//! McPherson). Fractional read positions are linearly interpolated.
 
 use std::sync::Arc;
 use truce::prelude::*;

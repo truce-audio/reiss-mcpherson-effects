@@ -1,8 +1,4 @@
 //! Tremolo - LFO-modulated amplitude.
-//!
-//! Ported from Juan Gil's "Audio Effects" Tremolo. Six waveforms
-//! cover sine through sloped-square; depth controls the depth of
-//! the amplitude modulation.
 
 use std::sync::Arc;
 use truce::prelude::*;

@@ -1,9 +1,4 @@
 //! Chorus - multiple LFO-modulated delay voices summed with dry.
-//!
-//! Ported from Juan Gil's "Audio Effects" Chorus. 2 to 5 voices are
-//! tapped from a shared delay line; voice 1 is the dry signal, the
-//! rest each get a phase-offset LFO tap that times-shifts them to
-//! simulate ensemble width.
 
 use std::sync::Arc;
 use truce::prelude::*;
