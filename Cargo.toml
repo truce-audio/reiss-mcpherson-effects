@@ -21,28 +21,29 @@ members = [
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
-license = "GPL-3.0-or-later"
+license = "Apache-2.0 OR MIT"
 rust-version = "1.92"
 
-# Point every truce-* crate at the sibling checkout. Versions match
-# the truce workspace at the time of writing.
+# truce crates from crates.io. `truce` itself opts out of default
+# features so each plugin enables formats explicitly via its own
+# `[features]` block.
 [workspace.dependencies]
-truce = { path = "../truce/crates/truce", default-features = false }
-truce-core = { path = "../truce/crates/truce-core" }
-truce-params = { path = "../truce/crates/truce-params" }
-truce-clap = { path = "../truce/crates/truce-clap" }
-truce-vst3 = { path = "../truce/crates/truce-vst3" }
-truce-au = { path = "../truce/crates/truce-au" }
-truce-standalone = { path = "../truce/crates/truce-standalone" }
-truce-gui = { path = "../truce/crates/truce-gui", default-features = false }
-truce-gui-types = { path = "../truce/crates/truce-gui-types" }
-truce-plugin = { path = "../truce/crates/truce-plugin" }
-truce-vst2 = { path = "../truce/crates/truce-vst2" }
-truce-lv2 = { path = "../truce/crates/truce-lv2" }
-truce-aax = { path = "../truce/crates/truce-aax" }
-truce-test = { path = "../truce/crates/truce-test" }
-truce-loader = { path = "../truce/crates/truce-loader" }
-truce-font = { path = "../truce/crates/truce-font" }
+truce = { version = "0.49", default-features = false }
+truce-core = "0.49"
+truce-params = "0.49"
+truce-clap = "0.49"
+truce-vst3 = "0.49"
+truce-au = "0.49"
+truce-standalone = "0.49"
+truce-gui = { version = "0.49", default-features = false }
+truce-gui-types = "0.49"
+truce-plugin = "0.49"
+truce-vst2 = "0.49"
+truce-lv2 = "0.49"
+truce-aax = "0.49"
+truce-test = "0.49"
+truce-loader = "0.49"
+truce-font = "0.49"
 clap-sys = "0.5"
 
 [workspace.lints.rust]
