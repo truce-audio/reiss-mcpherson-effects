@@ -5,8 +5,7 @@ Implementation and Application*, ported from
 [Juan Gil's JUCE implementations](https://github.com/juandagilc/Audio-Effects)
 to the [truce](https://github.com/truce-audio/truce) framework.
 
-Each plugin builds as CLAP / VST3 / VST2 / LV2 / AU / AAX / Standalone
-from one Rust crate.
+Each plugin builds as CLAP / VST3 / VST2 / LV2 / AU / AAX / Standalone.
 
 ## Plugins
 
