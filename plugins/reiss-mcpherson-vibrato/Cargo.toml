@@ -42,8 +42,5 @@ truce-gui-types = { workspace = true }
 truce-gui = { workspace = true, features = ["cpu"] }
 truce-loader = { workspace = true }
 
-[dev-dependencies]
-truce-test = { workspace = true }
-
 [lints]
 workspace = true

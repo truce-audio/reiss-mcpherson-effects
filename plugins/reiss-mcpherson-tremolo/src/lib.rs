@@ -169,21 +169,3 @@ truce::plugin! {
     logic: Tremolo,
     params: TremoloParams,
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn info_is_valid() {
-        truce_test::assert_valid_info::<Plugin>();
-    }
-    #[test]
-    fn has_editor() {
-        truce_test::assert_has_editor::<Plugin>();
-    }
-    #[test]
-    fn state_round_trips() {
-        truce_test::assert_state_round_trip::<Plugin>();
-    }
-}

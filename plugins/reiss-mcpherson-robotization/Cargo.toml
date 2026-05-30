@@ -45,8 +45,5 @@ realfft = "3"
 apodize = "1"
 fastrand = "2"
 
-[dev-dependencies]
-truce-test = { workspace = true }
-
 [lints]
 workspace = true

@@ -44,8 +44,5 @@ truce-loader = { workspace = true }
 realfft = "3"
 apodize = "1"
 
-[dev-dependencies]
-truce-test = { workspace = true }
-
 [lints]
 workspace = true

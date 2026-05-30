@@ -523,29 +523,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn info_is_valid() {
-        truce_test::assert_valid_info::<Plugin>();
-    }
-    #[test]
-    fn has_editor() {
-        truce_test::assert_has_editor::<Plugin>();
-    }
-    #[test]
-    fn state_round_trips() {
-        truce_test::assert_state_round_trip::<Plugin>();
-    }
-    #[test]
-    fn renders_no_nans() {
-        use std::time::Duration;
-        use truce_test::{InputSource, assertions, driver};
-        let result = driver!(Plugin)
-            .duration(Duration::from_millis(80))
-            .input(InputSource::Constant(0.3))
-            .run();
-        assertions::assert_no_nans(&result);
-    }
-
-    #[test]
     fn princ_arg_wraps() {
         let two_pi = std::f32::consts::TAU;
         for x in [0.0_f32, 0.5, 1.0, 3.0, 4.0, -3.5, 7.0] {

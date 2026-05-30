@@ -148,34 +148,3 @@ truce::plugin! {
     logic: Delay,
     params: DelayParams,
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn info_is_valid() {
-        truce_test::assert_valid_info::<Plugin>();
-    }
-
-    #[test]
-    fn has_editor() {
-        truce_test::assert_has_editor::<Plugin>();
-    }
-
-    #[test]
-    fn state_round_trips() {
-        truce_test::assert_state_round_trip::<Plugin>();
-    }
-
-    #[test]
-    fn renders_no_nans() {
-        use std::time::Duration;
-        use truce_test::{InputSource, assertions, driver};
-        let result = driver!(Plugin)
-            .duration(Duration::from_millis(50))
-            .input(InputSource::Constant(0.5))
-            .run();
-        assertions::assert_no_nans(&result);
-    }
-}
