@@ -1,11 +1,3 @@
-// `truce-derive` resolves `default = std::f64::consts::SQRT_2` into
-// an `f64` at parse time, then re-emits that f64 as a literal token
-// via `quote!`'s `f64_unsuffixed`. Clippy sees the literal in the
-// expansion and fires `approx_constant`. Suppress at the crate root
-// pending the upstream fix (wrap the embedded literal in
-// `#[allow]` or emit the source path verbatim when it came from one).
-#![allow(clippy::approx_constant)]
-
 //! Parametric EQ - single-band selectable filter.
 
 use std::sync::Arc;
