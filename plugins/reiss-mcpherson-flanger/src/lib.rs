@@ -269,9 +269,9 @@ impl PluginLogic for Flanger {
                 knob(P::Width, "Width"),
                 knob(P::Depth, "Depth"),
                 knob(P::Feedback, "Fbk"),
+                knob(P::Rate, "Rate"),
             ]),
             widgets(vec![
-                knob(P::Rate, "Rate"),
                 dropdown(P::Waveform, "Wave").cols(2),
                 dropdown(P::Interp, "Interp").cols(2),
                 toggle(P::Inverted, "Inv"),
@@ -279,7 +279,7 @@ impl PluginLogic for Flanger {
             ]),
         ])
         .with_title("FLANGER")
-        .with_cols(7)
+        .with_cols(6)
         .into_editor(&self.params)
     }
 }
