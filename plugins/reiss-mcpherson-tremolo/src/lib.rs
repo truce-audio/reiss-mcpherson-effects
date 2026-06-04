@@ -180,6 +180,7 @@ impl PluginLogic for Tremolo {
             dropdown(P::Waveform, "Wave").cols(2),
         ])])
         .with_title("TREMOLO")
+        .with_cols(4)
         .into_editor(&self.params)
     }
 }

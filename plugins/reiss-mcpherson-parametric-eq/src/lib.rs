@@ -259,6 +259,7 @@ impl PluginLogic for ParametricEq {
             dropdown(P::FilterType, "Type").cols(2),
         ])])
         .with_title("PARAMETRIC EQ")
+        .with_cols(5)
         .into_editor(&self.params)
     }
 }

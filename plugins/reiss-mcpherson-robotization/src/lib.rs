@@ -393,6 +393,7 @@ impl PluginLogic for Robotization {
             dropdown(P::Window, "Window").cols(2),
         ])])
         .with_title("ROBOTIZATION")
+        .with_cols(6)
         .into_editor(&self.params)
     }
 }

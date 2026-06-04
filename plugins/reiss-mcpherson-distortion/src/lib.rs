@@ -211,6 +211,7 @@ impl PluginLogic for Distortion {
             knob(P::Tone, "Tone"),
         ])])
         .with_title("DISTORTION")
+        .with_cols(5)
         .into_editor(&self.params)
     }
 }

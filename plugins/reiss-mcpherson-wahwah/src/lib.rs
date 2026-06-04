@@ -345,6 +345,7 @@ impl PluginLogic for WahWah {
             ),
         ])
         .with_title("WAH-WAH")
+        .with_cols(6)
         .into_editor(&self.params)
     }
 }

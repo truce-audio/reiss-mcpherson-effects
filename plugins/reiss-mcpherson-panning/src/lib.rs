@@ -219,7 +219,7 @@ impl PluginLogic for Panning {
 
     fn editor(&self) -> Box<dyn Editor> {
         GridLayout::build(vec![widgets(vec![
-            dropdown(P::Method, "Method"),
+            dropdown(P::Method, "Method").cols(2),
             knob(P::Pan, "Pan"),
         ])])
         .with_title("PANNING")

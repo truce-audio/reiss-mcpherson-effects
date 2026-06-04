@@ -292,11 +292,12 @@ impl PluginLogic for Chorus {
             widgets(vec![
                 knob(P::Rate, "Rate"),
                 dropdown(P::Waveform, "Wave").cols(2),
-                dropdown(P::Interp, "Interp"),
+                dropdown(P::Interp, "Interp").cols(2),
                 toggle(P::Stereo, "Stereo"),
             ]),
         ])
         .with_title("CHORUS")
+        .with_cols(6)
         .into_editor(&self.params)
     }
 }

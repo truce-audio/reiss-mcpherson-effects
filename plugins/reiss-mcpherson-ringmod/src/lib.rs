@@ -170,6 +170,7 @@ impl PluginLogic for RingMod {
             dropdown(P::Waveform, "Wave").cols(2),
         ])])
         .with_title("RING MOD")
+        .with_cols(4)
         .into_editor(&self.params)
     }
 }
