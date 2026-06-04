@@ -279,6 +279,7 @@ impl PluginLogic for Flanger {
             ]),
         ])
         .with_title("FLANGER")
+        .with_cols(7)
         .into_editor(&self.params)
     }
 }

@@ -223,6 +223,7 @@ impl PluginLogic for Panning {
             knob(P::Pan, "Pan"),
         ])])
         .with_title("PANNING")
+        .with_cols(3)
         .into_editor(&self.params)
     }
 }
