@@ -326,7 +326,7 @@ impl PluginLogic for WahWah {
             section(
                 "FILTER",
                 vec![
-                    dropdown(P::FilterType, "Type"),
+                    dropdown(P::FilterType, "Type").cols(2),
                     knob(P::Frequency, "Freq"),
                     knob(P::Q, "Q"),
                     knob(P::Gain, "Gain"),
@@ -336,7 +336,7 @@ impl PluginLogic for WahWah {
             section(
                 "CONTROL",
                 vec![
-                    dropdown(P::Mode, "Mode"),
+                    dropdown(P::Mode, "Mode").cols(2),
                     knob(P::LfoRate, "LFO"),
                     knob(P::LfoEnvMix, "LFO/Env"),
                     knob(P::EnvAttack, "Atk"),

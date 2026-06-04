@@ -212,8 +212,8 @@ impl PluginLogic for Vibrato {
         GridLayout::build(vec![widgets(vec![
             knob(P::Width, "Width"),
             knob(P::Rate, "Rate"),
-            dropdown(P::Waveform, "Wave"),
-            dropdown(P::Interp, "Interp"),
+            dropdown(P::Waveform, "Wave").cols(2),
+            dropdown(P::Interp, "Interp").cols(2),
         ])])
         .with_title("VIBRATO")
         .into_editor(&self.params)

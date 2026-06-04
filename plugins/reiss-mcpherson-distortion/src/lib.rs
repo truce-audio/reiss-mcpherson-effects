@@ -205,7 +205,7 @@ impl PluginLogic for Distortion {
 
     fn editor(&self) -> Box<dyn Editor> {
         GridLayout::build(vec![widgets(vec![
-            dropdown(P::DistortionType, "Type"),
+            dropdown(P::DistortionType, "Type").cols(2),
             knob(P::InputGain, "In"),
             knob(P::OutputGain, "Out"),
             knob(P::Tone, "Tone"),

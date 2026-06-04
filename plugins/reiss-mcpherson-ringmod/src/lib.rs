@@ -167,7 +167,7 @@ impl PluginLogic for RingMod {
         GridLayout::build(vec![widgets(vec![
             knob(P::Depth, "Depth"),
             knob(P::Frequency, "Freq"),
-            dropdown(P::Waveform, "Wave"),
+            dropdown(P::Waveform, "Wave").cols(2),
         ])])
         .with_title("RING MOD")
         .into_editor(&self.params)

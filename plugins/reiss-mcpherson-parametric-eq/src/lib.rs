@@ -256,7 +256,7 @@ impl PluginLogic for ParametricEq {
             knob(P::Frequency, "Freq"),
             knob(P::Q, "Q"),
             knob(P::Gain, "Gain"),
-            dropdown(P::FilterType, "Type"),
+            dropdown(P::FilterType, "Type").cols(2),
         ])])
         .with_title("PARAMETRIC EQ")
         .into_editor(&self.params)

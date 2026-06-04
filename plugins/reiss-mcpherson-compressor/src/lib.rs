@@ -208,7 +208,7 @@ impl PluginLogic for Compressor {
     fn editor(&self) -> Box<dyn Editor> {
         GridLayout::build(vec![
             widgets(vec![
-                dropdown(P::Mode, "Mode"),
+                dropdown(P::Mode, "Mode").cols(2),
                 knob(P::Threshold, "Thresh"),
                 knob(P::Ratio, "Ratio"),
             ]),

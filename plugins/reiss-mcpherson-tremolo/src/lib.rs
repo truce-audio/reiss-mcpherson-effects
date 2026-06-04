@@ -177,7 +177,7 @@ impl PluginLogic for Tremolo {
         GridLayout::build(vec![widgets(vec![
             knob(P::Depth, "Depth"),
             knob(P::Rate, "Rate"),
-            dropdown(P::Waveform, "Wave"),
+            dropdown(P::Waveform, "Wave").cols(2),
         ])])
         .with_title("TREMOLO")
         .into_editor(&self.params)

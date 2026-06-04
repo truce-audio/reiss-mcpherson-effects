@@ -272,8 +272,8 @@ impl PluginLogic for Flanger {
             ]),
             widgets(vec![
                 knob(P::Rate, "Rate"),
-                dropdown(P::Waveform, "Wave"),
-                dropdown(P::Interp, "Interp"),
+                dropdown(P::Waveform, "Wave").cols(2),
+                dropdown(P::Interp, "Interp").cols(2),
                 toggle(P::Inverted, "Inv"),
                 toggle(P::Stereo, "Stereo"),
             ]),

@@ -387,10 +387,10 @@ impl PluginLogic for Robotization {
 
     fn editor(&self) -> Box<dyn Editor> {
         GridLayout::build(vec![widgets(vec![
-            dropdown(P::Effect, "Effect"),
-            dropdown(P::FftSize, "FFT"),
-            dropdown(P::Hop, "Hop"),
-            dropdown(P::Window, "Window"),
+            dropdown(P::Effect, "Effect").cols(2),
+            dropdown(P::FftSize, "FFT").cols(2),
+            dropdown(P::Hop, "Hop").cols(2),
+            dropdown(P::Window, "Window").cols(2),
         ])])
         .with_title("ROBOTIZATION")
         .into_editor(&self.params)
