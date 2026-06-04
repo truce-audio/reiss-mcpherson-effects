@@ -9,17 +9,11 @@ Each plugin builds as CLAP / VST3 / LV2 / AU / AAX / Standalone.
 
 ## Plugins
 
-Screenshots below are rendered with `cargo truce screenshot` at
-the default 2× scale, so every PNG is captured at the same
-fixed DPI; the `width` / `height` on each `<img>` are the
-plugin's logical-point dimensions, which keeps the rendered
-density identical regardless of widget count.
-
 | Crate                                      | Effect                                | Screenshot |
 | ------------------------------------------ | ------------------------------------- | ---------- |
 | `reiss-mcpherson-delay`                    | Circular-buffer delay                 | <img src="screenshots/reiss-mcpherson-delay.png" width="208" height="113" alt="Reiss Delay editor"> |
 | `reiss-mcpherson-vibrato`                  | LFO-modulated delay (pitch wobble)    | <img src="screenshots/reiss-mcpherson-vibrato.png" width="415" height="113" alt="Reiss Vibrato editor"> |
-| `reiss-mcpherson-flanger`                  | Modulated short delay + dry sum       | <img src="screenshots/reiss-mcpherson-flanger.png" width="484" height="182" alt="Reiss Flanger editor"> |
+| `reiss-mcpherson-flanger`                  | Modulated short delay + dry sum       | <img src="screenshots/reiss-mcpherson-flanger.png" width="415" height="182" alt="Reiss Flanger editor"> |
 | `reiss-mcpherson-chorus`                   | Multi-voice ensemble chorus           | <img src="screenshots/reiss-mcpherson-chorus.png" width="346" height="182" alt="Reiss Chorus editor"> |
 | `reiss-mcpherson-pingpong`                 | Cross-channel ping-pong delay         | <img src="screenshots/reiss-mcpherson-pingpong.png" width="277" height="113" alt="Reiss Ping-Pong editor"> |
 | `reiss-mcpherson-parametric-eq`            | Single-band parametric EQ (7 shapes)  | <img src="screenshots/reiss-mcpherson-parametric-eq.png" width="346" height="113" alt="Reiss Parametric EQ editor"> |
