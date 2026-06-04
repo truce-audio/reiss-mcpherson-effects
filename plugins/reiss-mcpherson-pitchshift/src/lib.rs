@@ -413,9 +413,9 @@ impl PluginLogic for PitchShift {
     fn editor(&self) -> Box<dyn Editor> {
         GridLayout::build(vec![widgets(vec![
             knob(P::Shift, "Shift"),
-            dropdown(P::FftSize, "FFT").cols(2),
-            dropdown(P::Hop, "Hop").cols(2),
-            dropdown(P::Window, "Window").cols(2),
+            dropdown(P::FftSize, "FFT"),
+            dropdown(P::Hop, "Hop"),
+            dropdown(P::Window, "Window"),
         ])])
         .with_title("PITCH SHIFT")
         .into_editor(&self.params)

@@ -213,7 +213,7 @@ impl PluginLogic for Vibrato {
             knob(P::Width, "Width"),
             knob(P::Rate, "Rate"),
             dropdown(P::Waveform, "Wave").cols(2),
-            dropdown(P::Interp, "Interp").cols(2),
+            dropdown(P::Interp, "Interp"),
         ])])
         .with_title("VIBRATO")
         .into_editor(&self.params)

@@ -281,13 +281,13 @@ impl PluginLogic for Phaser {
             widgets(vec![
                 knob(P::Depth, "Depth"),
                 knob(P::Feedback, "Fbk"),
-                dropdown(P::Stages, "Stages").cols(2),
+                dropdown(P::Stages, "Stages"),
             ]),
             widgets(vec![
                 knob(P::MinFreq, "Min Hz"),
                 knob(P::SweepWidth, "Sweep"),
                 knob(P::LfoRate, "Rate"),
-                dropdown(P::Waveform, "Wave").cols(2),
+                dropdown(P::Waveform, "Wave"),
                 toggle(P::Stereo, "Stereo"),
             ]),
         ])

@@ -292,7 +292,7 @@ impl PluginLogic for Chorus {
             widgets(vec![
                 knob(P::Rate, "Rate"),
                 dropdown(P::Waveform, "Wave").cols(2),
-                dropdown(P::Interp, "Interp").cols(2),
+                dropdown(P::Interp, "Interp"),
                 toggle(P::Stereo, "Stereo"),
             ]),
         ])
