@@ -135,12 +135,17 @@ impl PluginLogic for Vibrato {
         let interp = self.params.interp.value();
         let num_ch = buffer.channels().min(self.buffer.len());
 
+        let mut width = [0.0_f32; MAX_BLOCK];
+        let mut rate = [0.0_f32; MAX_BLOCK];
+
         let mut offset = 0;
         while offset < total {
             let n = (total - offset).min(MAX_BLOCK);
 
-            let width = self.params.width.read_block::<MAX_BLOCK>();
-            let rate = self.params.rate.read_block::<MAX_BLOCK>();
+            // Slice-based read advances each smoother by `n`. See
+            // flanger for the rationale.
+            self.params.width.read_into(&mut width[..n]);
+            self.params.rate.read_into(&mut rate[..n]);
 
             // Precompute the read trajectory once - channels share
             // it, and the inner loop becomes pure stack-array reads.

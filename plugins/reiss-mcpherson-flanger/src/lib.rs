@@ -172,15 +172,28 @@ impl PluginLogic for Flanger {
         };
         let num_ch = buffer.channels().min(self.buffer.len());
 
+        let mut delay = [0.0_f32; MAX_BLOCK];
+        let mut width = [0.0_f32; MAX_BLOCK];
+        let mut depth = [0.0_f32; MAX_BLOCK];
+        let mut feedback = [0.0_f32; MAX_BLOCK];
+        let mut rate = [0.0_f32; MAX_BLOCK];
+
         let mut offset = 0;
         while offset < total {
             let n = (total - offset).min(MAX_BLOCK);
 
-            let delay = self.params.delay.read_block::<MAX_BLOCK>();
-            let width = self.params.width.read_block::<MAX_BLOCK>();
-            let depth = self.params.depth.read_block::<MAX_BLOCK>();
-            let feedback = self.params.feedback.read_block::<MAX_BLOCK>();
-            let rate = self.params.rate.read_block::<MAX_BLOCK>();
+            // `read_into` advances the smoother by exactly `n`,
+            // matching the samples we consume in this chunk. Using
+            // `read_block::<MAX_BLOCK>` here would advance the
+            // smoother by MAX_BLOCK regardless of `n`, stepping the
+            // delay / rate values at the block boundary and producing
+            // audible clicks whenever the host's block size isn't a
+            // multiple of MAX_BLOCK.
+            self.params.delay.read_into(&mut delay[..n]);
+            self.params.width.read_into(&mut width[..n]);
+            self.params.depth.read_into(&mut depth[..n]);
+            self.params.feedback.read_into(&mut feedback[..n]);
+            self.params.rate.read_into(&mut rate[..n]);
 
             // Per-channel read trajectories so the stereo LFO
             // offset is baked into the read-position arrays once

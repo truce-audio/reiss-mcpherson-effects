@@ -139,18 +139,20 @@ impl PluginLogic for Tremolo {
         let num_ch = buffer.channels();
 
         // Walk the buffer in MAX_BLOCK chunks. Per chunk: one
-        // block-read advances the smoother by exactly N samples,
-        // we precompute the LFO modulation curve once, then
-        // channel-major loops iterate the inner samples (the
+        // slice-based read advances each smoother by exactly the
+        // consumed `n`, we precompute the LFO modulation curve once,
+        // then channel-major loops iterate the inner samples (the
         // shape LLVM is happiest vectorising).
+        let mut depth = [0.0_f32; MAX_BLOCK];
+        let mut rate = [0.0_f32; MAX_BLOCK];
+        let mut gain = [0.0_f32; MAX_BLOCK];
+
         let mut offset = 0;
         while offset < total {
             let n = (total - offset).min(MAX_BLOCK);
 
-            let depth = self.params.depth.read_block::<MAX_BLOCK>();
-            let rate = self.params.rate.read_block::<MAX_BLOCK>();
-
-            let mut gain = [0.0_f32; MAX_BLOCK];
+            self.params.depth.read_into(&mut depth[..n]);
+            self.params.rate.read_into(&mut rate[..n]);
             for i in 0..n {
                 let m = lfo(self.lfo_phase, waveform);
                 gain[i] = 1.0 - depth[i] + depth[i] * m;

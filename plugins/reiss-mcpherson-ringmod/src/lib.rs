@@ -131,14 +131,18 @@ impl PluginLogic for RingMod {
         let waveform = self.params.waveform.value();
         let num_ch = buffer.channels();
 
+        let mut depth = [0.0_f32; MAX_BLOCK];
+        let mut freq = [0.0_f32; MAX_BLOCK];
+        let mut gain = [0.0_f32; MAX_BLOCK];
+
         let mut offset = 0;
         while offset < total {
             let n = (total - offset).min(MAX_BLOCK);
 
-            let depth = self.params.depth.read_block::<MAX_BLOCK>();
-            let freq = self.params.frequency.read_block::<MAX_BLOCK>();
-
-            let mut gain = [0.0_f32; MAX_BLOCK];
+            // Slice-based read advances each smoother by `n`. See
+            // flanger for the rationale.
+            self.params.depth.read_into(&mut depth[..n]);
+            self.params.frequency.read_into(&mut freq[..n]);
             for i in 0..n {
                 // Bipolar carrier in [-1, 1]; depth crossfades from
                 // dry (depth=0) to fully modulated (depth=1).

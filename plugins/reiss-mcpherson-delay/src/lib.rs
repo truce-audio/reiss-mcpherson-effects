@@ -88,13 +88,19 @@ impl PluginLogic for Delay {
         let buf_len_f = buf_len as f32;
         let num_ch = buffer.channels().min(self.buffer.len());
 
+        let mut delay_secs = [0.0_f32; MAX_BLOCK];
+        let mut feedback = [0.0_f32; MAX_BLOCK];
+        let mut mix = [0.0_f32; MAX_BLOCK];
+
         let mut offset = 0;
         while offset < total {
             let n = (total - offset).min(MAX_BLOCK);
 
-            let delay_secs = self.params.delay_time.read_block::<MAX_BLOCK>();
-            let feedback = self.params.feedback.read_block::<MAX_BLOCK>();
-            let mix = self.params.mix.read_block::<MAX_BLOCK>();
+            // Slice-based read advances each smoother by `n`. See
+            // flanger for the rationale.
+            self.params.delay_time.read_into(&mut delay_secs[..n]);
+            self.params.feedback.read_into(&mut feedback[..n]);
+            self.params.mix.read_into(&mut mix[..n]);
 
             // Precompute the read-position trajectory for the chunk
             // so the inner channel-major loop reads from stack

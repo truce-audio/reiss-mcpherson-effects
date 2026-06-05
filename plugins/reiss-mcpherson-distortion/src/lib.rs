@@ -166,6 +166,11 @@ impl PluginLogic for Distortion {
         let ty = self.params.distortion_type.value();
         let num_ch = buffer.channels().min(self.shelves.len());
 
+        let mut in_gain = [0.0_f32; MAX_BLOCK];
+        let mut out_gain = [0.0_f32; MAX_BLOCK];
+        let mut in_lin = [0.0_f32; MAX_BLOCK];
+        let mut out_lin = [0.0_f32; MAX_BLOCK];
+
         let mut offset = 0;
         while offset < total {
             let n = (total - offset).min(MAX_BLOCK);
@@ -178,10 +183,8 @@ impl PluginLogic for Distortion {
                 s.update(tone);
             }
 
-            let in_gain = self.params.input_gain.read_block::<MAX_BLOCK>();
-            let out_gain = self.params.output_gain.read_block::<MAX_BLOCK>();
-            let mut in_lin = [0.0_f32; MAX_BLOCK];
-            let mut out_lin = [0.0_f32; MAX_BLOCK];
+            self.params.input_gain.read_into(&mut in_gain[..n]);
+            self.params.output_gain.read_into(&mut out_gain[..n]);
             for i in 0..n {
                 in_lin[i] = 10f32.powf(in_gain[i] * 0.05);
                 out_lin[i] = 10f32.powf(out_gain[i] * 0.05);

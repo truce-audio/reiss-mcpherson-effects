@@ -251,18 +251,29 @@ impl PluginLogic for WahWah {
         let num_ch = buffer.channels().min(self.filters.len());
         let automatic = matches!(mode, Mode::Automatic);
 
+        let mut mix = [0.0_f32; MAX_BLOCK];
+        let mut env_attack = [0.0_f32; MAX_BLOCK];
+        let mut env_release = [0.0_f32; MAX_BLOCK];
+        let mut lfo_rate = [0.0_f32; MAX_BLOCK];
+        let mut lfo_env_mix = [0.0_f32; MAX_BLOCK];
+        let mut manual_freq = [0.0_f32; MAX_BLOCK];
+        let mut q_arr = [0.0_f32; MAX_BLOCK];
+        let mut gain_arr = [0.0_f32; MAX_BLOCK];
+
         let mut offset = 0;
         while offset < total {
             let n = (total - offset).min(MAX_BLOCK);
 
-            let mix = self.params.mix.read_block::<MAX_BLOCK>();
-            let env_attack = self.params.env_attack.read_block::<MAX_BLOCK>();
-            let env_release = self.params.env_release.read_block::<MAX_BLOCK>();
-            let lfo_rate = self.params.lfo_rate.read_block::<MAX_BLOCK>();
-            let lfo_env_mix = self.params.lfo_env_mix.read_block::<MAX_BLOCK>();
-            let manual_freq = self.params.frequency.read_block::<MAX_BLOCK>();
-            let q_arr = self.params.q.read_block::<MAX_BLOCK>();
-            let gain_arr = self.params.gain.read_block::<MAX_BLOCK>();
+            // Slice-based read advances each smoother by `n`. See
+            // flanger for the rationale.
+            self.params.mix.read_into(&mut mix[..n]);
+            self.params.env_attack.read_into(&mut env_attack[..n]);
+            self.params.env_release.read_into(&mut env_release[..n]);
+            self.params.lfo_rate.read_into(&mut lfo_rate[..n]);
+            self.params.lfo_env_mix.read_into(&mut lfo_env_mix[..n]);
+            self.params.frequency.read_into(&mut manual_freq[..n]);
+            self.params.q.read_into(&mut q_arr[..n]);
+            self.params.gain.read_into(&mut gain_arr[..n]);
 
             // Pre-compute attack/release coefficients and the
             // shared LFO contribution so the inner channel-major

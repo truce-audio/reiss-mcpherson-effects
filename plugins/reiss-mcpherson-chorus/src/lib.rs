@@ -193,14 +193,21 @@ impl PluginLogic for Chorus {
         let num_ch = buffer.channels().min(self.buffer.len());
         let num_wet = num_voices - 1;
 
+        let mut delay = [0.0_f32; MAX_BLOCK];
+        let mut width = [0.0_f32; MAX_BLOCK];
+        let mut depth = [0.0_f32; MAX_BLOCK];
+        let mut rate = [0.0_f32; MAX_BLOCK];
+
         let mut offset = 0;
         while offset < total {
             let n = (total - offset).min(MAX_BLOCK);
 
-            let delay = self.params.delay.read_block::<MAX_BLOCK>();
-            let width = self.params.width.read_block::<MAX_BLOCK>();
-            let depth = self.params.depth.read_block::<MAX_BLOCK>();
-            let rate = self.params.rate.read_block::<MAX_BLOCK>();
+            // Slice-based read advances each smoother by `n`. See
+            // flanger for the rationale.
+            self.params.delay.read_into(&mut delay[..n]);
+            self.params.width.read_into(&mut width[..n]);
+            self.params.depth.read_into(&mut depth[..n]);
+            self.params.rate.read_into(&mut rate[..n]);
 
             // Pre-build the per-voice read trajectories and the
             // shared write head. Read positions are voice-shared

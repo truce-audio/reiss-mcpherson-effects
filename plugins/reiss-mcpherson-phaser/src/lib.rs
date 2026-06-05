@@ -211,15 +211,24 @@ impl PluginLogic for Phaser {
         let num_filters = self.params.stages.value().count();
         let num_ch = buffer.channels().min(self.filters.len());
 
+        let mut depth = [0.0_f32; MAX_BLOCK];
+        let mut feedback = [0.0_f32; MAX_BLOCK];
+        let mut min_f = [0.0_f32; MAX_BLOCK];
+        let mut sweep = [0.0_f32; MAX_BLOCK];
+        let mut rate = [0.0_f32; MAX_BLOCK];
+
         let mut offset = 0;
         while offset < total {
             let n = (total - offset).min(MAX_BLOCK);
 
-            let depth = self.params.depth.read_block::<MAX_BLOCK>();
-            let feedback = self.params.feedback.read_block::<MAX_BLOCK>();
-            let min_f = self.params.min_freq.read_block::<MAX_BLOCK>();
-            let sweep = self.params.sweep_width.read_block::<MAX_BLOCK>();
-            let rate = self.params.lfo_rate.read_block::<MAX_BLOCK>();
+            // `read_into` advances the smoother by exactly `n`. See
+            // the comment in flanger for why `read_block::<MAX_BLOCK>`
+            // is wrong inside a dynamic-length chunk loop.
+            self.params.depth.read_into(&mut depth[..n]);
+            self.params.feedback.read_into(&mut feedback[..n]);
+            self.params.min_freq.read_into(&mut min_f[..n]);
+            self.params.sweep_width.read_into(&mut sweep[..n]);
+            self.params.lfo_rate.read_into(&mut rate[..n]);
 
             // Schedule coefficient updates - each entry is the
             // discrete frequency to install (or NaN for "no update
