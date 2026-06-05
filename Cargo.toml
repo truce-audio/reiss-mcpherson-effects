@@ -28,21 +28,21 @@ rust-version = "1.92"
 # features so each plugin enables formats explicitly via its own
 # `[features]` block.
 [workspace.dependencies]
-truce = { version = "0.53", default-features = false }
-truce-core = "0.53"
-truce-params = "0.53"
-truce-clap = "0.53"
-truce-vst3 = "0.53"
-truce-au = "0.53"
-truce-standalone = "0.53"
-truce-gui = { version = "0.53", default-features = false }
-truce-gui-types = "0.53"
-truce-plugin = "0.53"
-truce-vst2 = "0.53"
-truce-lv2 = "0.53"
-truce-aax = "0.53"
-truce-loader = "0.53"
-truce-font = "0.53"
+truce = { version = "0.54", default-features = false }
+truce-core = "0.54"
+truce-params = "0.54"
+truce-clap = "0.54"
+truce-vst3 = "0.54"
+truce-au = "0.54"
+truce-standalone = "0.54"
+truce-gui = { version = "0.54", default-features = false }
+truce-gui-types = "0.54"
+truce-plugin = "0.54"
+truce-vst2 = "0.54"
+truce-lv2 = "0.54"
+truce-aax = "0.54"
+truce-loader = "0.54"
+truce-font = "0.54"
 clap-sys = "0.5"
 
 [workspace.lints.rust]
