@@ -81,7 +81,11 @@ rm -f target/dist/*.tar.gz
 echo "==> packaging"
 cargo truce package
 
-mapfile -t tarball_paths < <(ls -1 target/dist/*.tar.gz 2>/dev/null)
+# `mapfile` would be cleaner but macOS ships bash 3.2 which doesn't
+# have it; the while-read loop is the portable equivalent (Linux /
+# WSL bash 4+ supports both).
+tarball_paths=()
+while IFS= read -r p; do tarball_paths+=("$p"); done < <(ls -1 target/dist/*.tar.gz 2>/dev/null || true)
 if [[ ${#tarball_paths[@]} -eq 0 ]]; then
     echo "no .tar.gz produced under target/dist/" >&2
     exit 1

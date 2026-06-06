@@ -78,7 +78,11 @@ rm -f target/dist/*.exe
 echo "==> packaging via cargo.exe"
 cargo.exe truce package --formats clap,vst3,vst2,standalone
 
-mapfile -t exe_paths < <(ls -1 target/dist/*.exe 2>/dev/null)
+# `mapfile` would be cleaner but macOS ships bash 3.2 which doesn't
+# have it; the while-read loop is the portable equivalent (WSL
+# bash 4+ supports both, but keeping the scripts uniform).
+exe_paths=()
+while IFS= read -r p; do exe_paths+=("$p"); done < <(ls -1 target/dist/*.exe 2>/dev/null || true)
 if [[ ${#exe_paths[@]} -eq 0 ]]; then
     echo "no .exe produced under target/dist/" >&2
     exit 1
