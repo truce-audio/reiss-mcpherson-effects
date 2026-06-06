@@ -101,7 +101,10 @@ else
     cargo truce package --no-notarize --formats "$formats"
 fi
 
-mapfile -t pkg_paths < <(ls -1 target/dist/*.pkg 2>/dev/null)
+# `mapfile` would be cleaner but macOS ships bash 3.2 which doesn't
+# have it; the while-read loop is the portable equivalent.
+pkg_paths=()
+while IFS= read -r p; do pkg_paths+=("$p"); done < <(ls -1 target/dist/*.pkg 2>/dev/null || true)
 if [[ ${#pkg_paths[@]} -eq 0 ]]; then
     echo "no .pkg produced under target/dist/" >&2
     exit 1
