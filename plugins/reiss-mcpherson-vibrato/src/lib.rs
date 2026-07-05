@@ -153,8 +153,7 @@ impl PluginLogic for Vibrato {
             let mut frac_arr = [0.0_f32; MAX_BLOCK];
             let mut write_idx = [0usize; MAX_BLOCK];
             for i in 0..n {
-                let delay_samples =
-                    width[i] * lfo(self.lfo_phase, waveform) * self.sample_rate;
+                let delay_samples = width[i] * lfo(self.lfo_phase, waveform) * self.sample_rate;
                 let write = self.write_pos;
                 #[allow(clippy::cast_precision_loss)]
                 let read_pos =

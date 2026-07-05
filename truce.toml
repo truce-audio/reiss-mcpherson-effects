@@ -6,9 +6,13 @@ id = "com.truce.reiss-mcpherson"
 url = "https://github.com/truce-audio/reiss-mcpherson-effects"
 au_manufacturer = "Rmcp"
 
+# bundle_ids pin the 1.x name-derived plugin ids ("Reiss Delay" ->
+# reissdelay); truce 2.0 derives clap_id / vst3_id / the state hash
+# from bundle_id, so changing these would orphan shipped sessions.
+
 [[plugin]]
 name = "Reiss Delay"
-bundle_id = "reiss-delay"
+bundle_id = "reissdelay"
 crate = "reiss-mcpherson-delay"
 category = "effect"
 fourcc = "RDly"
@@ -18,7 +22,7 @@ vst3_subcategory = "Delay"
 
 [[plugin]]
 name = "Reiss Vibrato"
-bundle_id = "reiss-vibrato"
+bundle_id = "reissvibrato"
 crate = "reiss-mcpherson-vibrato"
 category = "effect"
 fourcc = "RVib"
@@ -28,7 +32,7 @@ vst3_subcategory = "Modulation"
 
 [[plugin]]
 name = "Reiss Flanger"
-bundle_id = "reiss-flanger"
+bundle_id = "reissflanger"
 crate = "reiss-mcpherson-flanger"
 category = "effect"
 fourcc = "RFlg"
@@ -38,7 +42,7 @@ vst3_subcategory = "Modulation"
 
 [[plugin]]
 name = "Reiss Chorus"
-bundle_id = "reiss-chorus"
+bundle_id = "reisschorus"
 crate = "reiss-mcpherson-chorus"
 category = "effect"
 fourcc = "RChr"
@@ -48,7 +52,7 @@ vst3_subcategory = "Modulation"
 
 [[plugin]]
 name = "Reiss Ping-Pong"
-bundle_id = "reiss-pingpong"
+bundle_id = "reissping-pong"
 crate = "reiss-mcpherson-pingpong"
 category = "effect"
 fourcc = "RPpD"
@@ -58,7 +62,7 @@ vst3_subcategory = "Delay"
 
 [[plugin]]
 name = "Reiss Parametric EQ"
-bundle_id = "reiss-parametric-eq"
+bundle_id = "reissparametriceq"
 crate = "reiss-mcpherson-parametric-eq"
 category = "effect"
 fourcc = "RPeq"
@@ -68,7 +72,7 @@ vst3_subcategory = "EQ"
 
 [[plugin]]
 name = "Reiss Wah-Wah"
-bundle_id = "reiss-wahwah"
+bundle_id = "reisswah-wah"
 crate = "reiss-mcpherson-wahwah"
 category = "effect"
 fourcc = "RWah"
@@ -78,7 +82,7 @@ vst3_subcategory = "Filter"
 
 [[plugin]]
 name = "Reiss Phaser"
-bundle_id = "reiss-phaser"
+bundle_id = "reissphaser"
 crate = "reiss-mcpherson-phaser"
 category = "effect"
 fourcc = "RPhs"
@@ -88,7 +92,7 @@ vst3_subcategory = "Modulation"
 
 [[plugin]]
 name = "Reiss Tremolo"
-bundle_id = "reiss-tremolo"
+bundle_id = "reisstremolo"
 crate = "reiss-mcpherson-tremolo"
 category = "effect"
 fourcc = "RTrm"
@@ -98,7 +102,7 @@ vst3_subcategory = "Modulation"
 
 [[plugin]]
 name = "Reiss Ring Mod"
-bundle_id = "reiss-ringmod"
+bundle_id = "reissringmod"
 crate = "reiss-mcpherson-ringmod"
 category = "effect"
 fourcc = "RRng"
@@ -108,7 +112,7 @@ vst3_subcategory = "Modulation"
 
 [[plugin]]
 name = "Reiss Compressor"
-bundle_id = "reiss-compressor"
+bundle_id = "reisscompressor"
 crate = "reiss-mcpherson-compressor"
 category = "effect"
 fourcc = "RCmp"
@@ -118,7 +122,7 @@ vst3_subcategory = "Dynamics"
 
 [[plugin]]
 name = "Reiss Distortion"
-bundle_id = "reiss-distortion"
+bundle_id = "reissdistortion"
 crate = "reiss-mcpherson-distortion"
 category = "effect"
 fourcc = "RDst"
@@ -128,7 +132,7 @@ vst3_subcategory = "Distortion"
 
 [[plugin]]
 name = "Reiss Panning"
-bundle_id = "reiss-panning"
+bundle_id = "reisspanning"
 crate = "reiss-mcpherson-panning"
 category = "effect"
 fourcc = "RPan"
@@ -138,7 +142,7 @@ vst3_subcategory = "Spatial"
 
 [[plugin]]
 name = "Reiss Robotization"
-bundle_id = "reiss-robotization"
+bundle_id = "reissrobotization"
 crate = "reiss-mcpherson-robotization"
 category = "effect"
 fourcc = "RRob"
@@ -148,7 +152,7 @@ vst3_subcategory = "Pitch Shift"
 
 [[plugin]]
 name = "Reiss Pitch Shift"
-bundle_id = "reiss-pitchshift"
+bundle_id = "reisspitchshift"
 crate = "reiss-mcpherson-pitchshift"
 category = "effect"
 fourcc = "RPit"

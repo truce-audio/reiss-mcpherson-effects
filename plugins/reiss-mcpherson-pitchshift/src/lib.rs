@@ -354,7 +354,7 @@ impl PluginLogic for PitchShift {
         #[allow(
             clippy::cast_possible_truncation,
             clippy::cast_sign_loss,
-            clippy::cast_precision_loss,
+            clippy::cast_precision_loss
         )]
         let resampled_len = ((fft_size as f32) / ratio).floor() as usize;
         let resampled_len = resampled_len.min(pv.output_len);

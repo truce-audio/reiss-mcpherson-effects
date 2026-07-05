@@ -285,8 +285,7 @@ impl PluginLogic for WahWah {
                 attack_co[i] = attack_release_coeff(env_attack[i], self.inv_sr);
                 release_co[i] = attack_release_coeff(env_release[i], self.inv_sr);
                 if automatic {
-                    lfo_norm[i] =
-                        0.5 + 0.5 * (std::f32::consts::TAU * self.lfo_phase).sin();
+                    lfo_norm[i] = 0.5 + 0.5 * (std::f32::consts::TAU * self.lfo_phase).sin();
                     self.lfo_phase += lfo_rate[i] * self.inv_sr;
                     if self.lfo_phase >= 1.0 {
                         self.lfo_phase -= 1.0;
@@ -317,7 +316,14 @@ impl PluginLogic for WahWah {
                     };
                     let q = f64::from(q_arr[i]);
                     let gain_lin = 10f64.powf(f64::from(gain_arr[i]) * 0.05);
-                    update(filter, f64::from(centre_freq_hz), q, gain_lin, ty, self.sample_rate);
+                    update(
+                        filter,
+                        f64::from(centre_freq_hz),
+                        q,
+                        gain_lin,
+                        ty,
+                        self.sample_rate,
+                    );
 
                     #[allow(clippy::cast_possible_truncation)]
                     let filtered = filter.process(f64::from(in_sample)) as f32;

@@ -113,8 +113,7 @@ impl PluginLogic for Delay {
                 let delay_samples = delay_secs[i] * self.sample_rate;
                 let write = self.write_pos;
                 #[allow(clippy::cast_precision_loss)]
-                let read_pos =
-                    (write as f32 - delay_samples + buf_len_f).rem_euclid(buf_len_f);
+                let read_pos = (write as f32 - delay_samples + buf_len_f).rem_euclid(buf_len_f);
                 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
                 let r0 = read_pos.floor() as usize;
                 read_idx[i] = r0;

@@ -217,8 +217,7 @@ impl PluginLogic for Flanger {
                     let delay_samples =
                         (delay[i] + width[i] * lfo(ph, waveform)) * self.sample_rate;
                     #[allow(clippy::cast_precision_loss)]
-                    let read_pos =
-                        (write as f32 - delay_samples + buf_len_f).rem_euclid(buf_len_f);
+                    let read_pos = (write as f32 - delay_samples + buf_len_f).rem_euclid(buf_len_f);
                     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
                     let r0 = read_pos.floor() as usize % buf_len;
                     read_idx[ch][i] = r0;

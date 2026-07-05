@@ -214,19 +214,18 @@ impl PluginLogic for Chorus {
             // across channels (chorus depends only on the LFO,
             // not the channel index), so we don't need a per-
             // channel copy.
-            let mut read_pos =
-                [[0.0_f32; MAX_BLOCK]; MAX_VOICES_MINUS_ONE];
+            let mut read_pos = [[0.0_f32; MAX_BLOCK]; MAX_VOICES_MINUS_ONE];
             let mut write_idx = [0usize; MAX_BLOCK];
             for i in 0..n {
                 write_idx[i] = self.write_pos;
                 let mut phase_offset = 0.0_f32;
                 for v in 0..num_wet {
-                    let local_delay =
-                        (delay[i] + width[i] * lfo(self.lfo_phase + phase_offset, waveform))
-                            * self.sample_rate;
+                    let local_delay = (delay[i]
+                        + width[i] * lfo(self.lfo_phase + phase_offset, waveform))
+                        * self.sample_rate;
                     #[allow(clippy::cast_precision_loss)]
-                    let pos = (self.write_pos as f32 - local_delay + buf_len_f)
-                        .rem_euclid(buf_len_f);
+                    let pos =
+                        (self.write_pos as f32 - local_delay + buf_len_f).rem_euclid(buf_len_f);
                     read_pos[v][i] = pos;
                     if num_voices == 3 {
                         phase_offset += 0.25;
