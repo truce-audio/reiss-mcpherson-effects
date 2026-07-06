@@ -1518,7 +1518,7 @@ dependencies = [
 
 [[package]]
 name = "reiss-mcpherson-chorus"
-version = "1.0.0"
+version = "3.0.0"
 dependencies = [
  "clap-sys",
  "truce",
@@ -1538,7 +1538,7 @@ dependencies = [
 
 [[package]]
 name = "reiss-mcpherson-compressor"
-version = "1.0.0"
+version = "3.0.0"
 dependencies = [
  "clap-sys",
  "truce",
@@ -1558,7 +1558,7 @@ dependencies = [
 
 [[package]]
 name = "reiss-mcpherson-delay"
-version = "1.0.0"
+version = "3.0.0"
 dependencies = [
  "clap-sys",
  "truce",
@@ -1578,7 +1578,7 @@ dependencies = [
 
 [[package]]
 name = "reiss-mcpherson-distortion"
-version = "1.0.0"
+version = "3.0.0"
 dependencies = [
  "clap-sys",
  "truce",
@@ -1598,7 +1598,7 @@ dependencies = [
 
 [[package]]
 name = "reiss-mcpherson-flanger"
-version = "1.0.0"
+version = "3.0.0"
 dependencies = [
  "clap-sys",
  "truce",
@@ -1618,7 +1618,7 @@ dependencies = [
 
 [[package]]
 name = "reiss-mcpherson-panning"
-version = "1.0.0"
+version = "3.0.0"
 dependencies = [
  "clap-sys",
  "truce",
@@ -1638,7 +1638,7 @@ dependencies = [
 
 [[package]]
 name = "reiss-mcpherson-parametric-eq"
-version = "1.0.0"
+version = "3.0.0"
 dependencies = [
  "clap-sys",
  "truce",
@@ -1658,7 +1658,7 @@ dependencies = [
 
 [[package]]
 name = "reiss-mcpherson-phaser"
-version = "1.0.0"
+version = "3.0.0"
 dependencies = [
  "clap-sys",
  "truce",
@@ -1678,7 +1678,7 @@ dependencies = [
 
 [[package]]
 name = "reiss-mcpherson-pingpong"
-version = "1.0.0"
+version = "3.0.0"
 dependencies = [
  "clap-sys",
  "truce",
@@ -1698,7 +1698,7 @@ dependencies = [
 
 [[package]]
 name = "reiss-mcpherson-pitchshift"
-version = "1.0.0"
+version = "3.0.0"
 dependencies = [
  "apodize",
  "clap-sys",
@@ -1720,7 +1720,7 @@ dependencies = [
 
 [[package]]
 name = "reiss-mcpherson-ringmod"
-version = "1.0.0"
+version = "3.0.0"
 dependencies = [
  "clap-sys",
  "truce",
@@ -1740,7 +1740,7 @@ dependencies = [
 
 [[package]]
 name = "reiss-mcpherson-robotization"
-version = "1.0.0"
+version = "3.0.0"
 dependencies = [
  "apodize",
  "clap-sys",
@@ -1763,7 +1763,7 @@ dependencies = [
 
 [[package]]
 name = "reiss-mcpherson-tremolo"
-version = "1.0.0"
+version = "3.0.0"
 dependencies = [
  "clap-sys",
  "truce",
@@ -1783,7 +1783,7 @@ dependencies = [
 
 [[package]]
 name = "reiss-mcpherson-vibrato"
-version = "1.0.0"
+version = "3.0.0"
 dependencies = [
  "clap-sys",
  "truce",
@@ -1803,7 +1803,7 @@ dependencies = [
 
 [[package]]
 name = "reiss-mcpherson-wahwah"
-version = "1.0.0"
+version = "3.0.0"
 dependencies = [
  "clap-sys",
  "truce",

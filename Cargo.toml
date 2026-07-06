@@ -1,5 +1,5 @@
 [workspace]
-resolver = "2"
+resolver = "3"
 members = [
     "plugins/reiss-mcpherson-delay",
     "plugins/reiss-mcpherson-vibrato",
@@ -19,7 +19,7 @@ members = [
 ]
 
 [workspace.package]
-version = "1.0.0"
+version = "3.0.0"
 edition = "2024"
 license = "Apache-2.0 OR MIT"
 rust-version = "1.92"
