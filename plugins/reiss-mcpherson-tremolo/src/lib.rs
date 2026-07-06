@@ -114,6 +114,8 @@ fn lfo(phase: f32, waveform: Waveform) -> f32 {
 }
 
 impl PluginLogic for Tremolo {
+    type Params = TremoloParams;
+
     fn reset(&mut self, sample_rate: f64, _max_block_size: usize) {
         #[allow(clippy::cast_possible_truncation)]
         {
@@ -175,7 +177,7 @@ impl PluginLogic for Tremolo {
         ProcessStatus::Normal
     }
 
-    fn editor(&self) -> Box<dyn Editor> {
+    fn editor(params: Arc<TremoloParams>) -> Box<dyn Editor> {
         GridLayout::build(vec![widgets(vec![
             knob(P::Depth, "Depth"),
             knob(P::Rate, "Rate"),
@@ -183,7 +185,7 @@ impl PluginLogic for Tremolo {
         ])])
         .with_title("TREMOLO")
         .with_cols(4)
-        .into_editor(&self.params)
+        .into_editor(&params)
     }
 }
 

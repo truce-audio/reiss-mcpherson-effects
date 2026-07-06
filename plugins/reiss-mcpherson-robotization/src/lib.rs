@@ -295,6 +295,8 @@ impl Robotization {
 }
 
 impl PluginLogic for Robotization {
+    type Params = RobotParams;
+
     fn reset(&mut self, sample_rate: f64, _max_block_size: usize) {
         self.params.set_sample_rate(sample_rate);
         self.params.snap_smoothers();
@@ -385,7 +387,7 @@ impl PluginLogic for Robotization {
         ProcessStatus::Normal
     }
 
-    fn editor(&self) -> Box<dyn Editor> {
+    fn editor(params: Arc<RobotParams>) -> Box<dyn Editor> {
         GridLayout::build(vec![widgets(vec![
             dropdown(P::Effect, "Effect").cols(2),
             dropdown(P::FftSize, "FFT"),
@@ -394,7 +396,7 @@ impl PluginLogic for Robotization {
         ])])
         .with_title("ROBOTIZATION")
         .with_cols(6)
-        .into_editor(&self.params)
+        .into_editor(&params)
     }
 }
 

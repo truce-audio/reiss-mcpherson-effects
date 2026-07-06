@@ -308,6 +308,8 @@ impl PitchShift {
 }
 
 impl PluginLogic for PitchShift {
+    type Params = PitchShiftParams;
+
     fn reset(&mut self, sample_rate: f64, _max_block_size: usize) {
         self.params.set_sample_rate(sample_rate);
         self.params.snap_smoothers();
@@ -410,7 +412,7 @@ impl PluginLogic for PitchShift {
         ProcessStatus::Normal
     }
 
-    fn editor(&self) -> Box<dyn Editor> {
+    fn editor(params: Arc<PitchShiftParams>) -> Box<dyn Editor> {
         GridLayout::build(vec![widgets(vec![
             knob(P::Shift, "Shift"),
             dropdown(P::FftSize, "FFT"),
@@ -418,7 +420,7 @@ impl PluginLogic for PitchShift {
             dropdown(P::Window, "Window"),
         ])])
         .with_title("PITCH SHIFT")
-        .into_editor(&self.params)
+        .into_editor(&params)
     }
 }
 

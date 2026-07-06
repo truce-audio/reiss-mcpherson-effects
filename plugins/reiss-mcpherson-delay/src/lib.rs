@@ -60,6 +60,8 @@ impl Delay {
 }
 
 impl PluginLogic for Delay {
+    type Params = DelayParams;
+
     fn reset(&mut self, sample_rate: f64, _max_block_size: usize) {
         #[allow(clippy::cast_possible_truncation)]
         let sr = sample_rate as f32;
@@ -153,14 +155,14 @@ impl PluginLogic for Delay {
         ProcessStatus::Normal
     }
 
-    fn editor(&self) -> Box<dyn Editor> {
+    fn editor(params: Arc<DelayParams>) -> Box<dyn Editor> {
         GridLayout::build(vec![widgets(vec![
             knob(P::DelayTime, "Time"),
             knob(P::Feedback, "Feedback"),
             knob(P::Mix, "Mix"),
         ])])
         .with_title("DELAY")
-        .into_editor(&self.params)
+        .into_editor(&params)
     }
 }
 

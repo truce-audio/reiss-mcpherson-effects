@@ -110,6 +110,8 @@ fn lfo(phase: f32, waveform: Waveform) -> f32 {
 }
 
 impl PluginLogic for RingMod {
+    type Params = RingModParams;
+
     fn reset(&mut self, sample_rate: f64, _max_block_size: usize) {
         #[allow(clippy::cast_possible_truncation)]
         {
@@ -167,7 +169,7 @@ impl PluginLogic for RingMod {
         ProcessStatus::Normal
     }
 
-    fn editor(&self) -> Box<dyn Editor> {
+    fn editor(params: Arc<RingModParams>) -> Box<dyn Editor> {
         GridLayout::build(vec![widgets(vec![
             knob(P::Depth, "Depth"),
             knob(P::Frequency, "Freq"),
@@ -175,7 +177,7 @@ impl PluginLogic for RingMod {
         ])])
         .with_title("RING MOD")
         .with_cols(4)
-        .into_editor(&self.params)
+        .into_editor(&params)
     }
 }
 

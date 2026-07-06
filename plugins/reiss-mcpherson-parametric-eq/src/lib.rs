@@ -191,6 +191,8 @@ impl ParametricEq {
 }
 
 impl PluginLogic for ParametricEq {
+    type Params = ParametricEqParams;
+
     fn reset(&mut self, sample_rate: f64, _max_block_size: usize) {
         self.sample_rate = sample_rate;
         self.params.set_sample_rate(sample_rate);
@@ -251,7 +253,7 @@ impl PluginLogic for ParametricEq {
         ProcessStatus::Normal
     }
 
-    fn editor(&self) -> Box<dyn Editor> {
+    fn editor(params: Arc<ParametricEqParams>) -> Box<dyn Editor> {
         GridLayout::build(vec![widgets(vec![
             knob(P::Frequency, "Freq"),
             knob(P::Q, "Q"),
@@ -260,7 +262,7 @@ impl PluginLogic for ParametricEq {
         ])])
         .with_title("PARAMETRIC EQ")
         .with_cols(5)
-        .into_editor(&self.params)
+        .into_editor(&params)
     }
 }
 

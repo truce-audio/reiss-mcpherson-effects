@@ -126,6 +126,8 @@ impl Panning {
 }
 
 impl PluginLogic for Panning {
+    type Params = PanningParams;
+
     fn reset(&mut self, sample_rate: f64, _max_block_size: usize) {
         #[allow(clippy::cast_possible_truncation)]
         let sr = sample_rate as f32;
@@ -217,14 +219,14 @@ impl PluginLogic for Panning {
         ProcessStatus::Normal
     }
 
-    fn editor(&self) -> Box<dyn Editor> {
+    fn editor(params: Arc<PanningParams>) -> Box<dyn Editor> {
         GridLayout::build(vec![widgets(vec![
             dropdown(P::Method, "Method").cols(2),
             knob(P::Pan, "Pan"),
         ])])
         .with_title("PANNING")
         .with_cols(3)
-        .into_editor(&self.params)
+        .into_editor(&params)
     }
 }
 

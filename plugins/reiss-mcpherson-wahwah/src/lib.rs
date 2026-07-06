@@ -224,6 +224,8 @@ fn attack_release_coeff(value_s: f32, inv_sr: f32) -> f32 {
 }
 
 impl PluginLogic for WahWah {
+    type Params = WahWahParams;
+
     fn reset(&mut self, sample_rate: f64, _max_block_size: usize) {
         self.sample_rate = sample_rate;
         #[allow(clippy::cast_possible_truncation)]
@@ -338,7 +340,7 @@ impl PluginLogic for WahWah {
         ProcessStatus::Normal
     }
 
-    fn editor(&self) -> Box<dyn Editor> {
+    fn editor(params: Arc<WahWahParams>) -> Box<dyn Editor> {
         GridLayout::build(vec![
             section(
                 "FILTER",
@@ -363,7 +365,7 @@ impl PluginLogic for WahWah {
         ])
         .with_title("WAH-WAH")
         .with_cols(6)
-        .into_editor(&self.params)
+        .into_editor(&params)
     }
 }
 

@@ -100,6 +100,8 @@ fn attack_release_coeff(value_s: f32, inv_sr: f32) -> f32 {
 }
 
 impl PluginLogic for Compressor {
+    type Params = CompressorParams;
+
     fn reset(&mut self, sample_rate: f64, _max_block_size: usize) {
         #[allow(clippy::cast_possible_truncation)]
         {
@@ -205,7 +207,7 @@ impl PluginLogic for Compressor {
         ProcessStatus::Normal
     }
 
-    fn editor(&self) -> Box<dyn Editor> {
+    fn editor(params: Arc<CompressorParams>) -> Box<dyn Editor> {
         GridLayout::build(vec![
             widgets(vec![
                 dropdown(P::Mode, "Mode").cols(2),
@@ -220,7 +222,7 @@ impl PluginLogic for Compressor {
             ]),
         ])
         .with_title("COMP/EXP")
-        .into_editor(&self.params)
+        .into_editor(&params)
     }
 }
 

@@ -71,6 +71,8 @@ impl PingPong {
 }
 
 impl PluginLogic for PingPong {
+    type Params = PingPongParams;
+
     fn reset(&mut self, sample_rate: f64, _max_block_size: usize) {
         #[allow(clippy::cast_possible_truncation)]
         let sr = sample_rate as f32;
@@ -148,7 +150,7 @@ impl PluginLogic for PingPong {
         ProcessStatus::Normal
     }
 
-    fn editor(&self) -> Box<dyn Editor> {
+    fn editor(params: Arc<PingPongParams>) -> Box<dyn Editor> {
         GridLayout::build(vec![widgets(vec![
             knob(P::Balance, "Bal"),
             knob(P::DelayTime, "Time"),
@@ -156,7 +158,7 @@ impl PluginLogic for PingPong {
             knob(P::Mix, "Mix"),
         ])])
         .with_title("PING-PONG")
-        .into_editor(&self.params)
+        .into_editor(&params)
     }
 }
 

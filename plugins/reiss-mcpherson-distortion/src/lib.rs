@@ -148,6 +148,8 @@ impl Distortion {
 }
 
 impl PluginLogic for Distortion {
+    type Params = DistortionParams;
+
     fn reset(&mut self, sample_rate: f64, _max_block_size: usize) {
         self.params.set_sample_rate(sample_rate);
         self.params.snap_smoothers();
@@ -206,7 +208,7 @@ impl PluginLogic for Distortion {
         ProcessStatus::Normal
     }
 
-    fn editor(&self) -> Box<dyn Editor> {
+    fn editor(params: Arc<DistortionParams>) -> Box<dyn Editor> {
         GridLayout::build(vec![widgets(vec![
             dropdown(P::DistortionType, "Type").cols(2),
             knob(P::InputGain, "In"),
@@ -215,7 +217,7 @@ impl PluginLogic for Distortion {
         ])])
         .with_title("DISTORTION")
         .with_cols(5)
-        .into_editor(&self.params)
+        .into_editor(&params)
     }
 }
 

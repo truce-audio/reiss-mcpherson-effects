@@ -159,6 +159,8 @@ fn sample_at(line: &[f32], pos: f32, buf_len: usize, interp: Interpolation) -> f
 }
 
 impl PluginLogic for Chorus {
+    type Params = ChorusParams;
+
     fn reset(&mut self, sample_rate: f64, _max_block_size: usize) {
         #[allow(clippy::cast_possible_truncation)]
         let sr = sample_rate as f32;
@@ -287,7 +289,7 @@ impl PluginLogic for Chorus {
         ProcessStatus::Normal
     }
 
-    fn editor(&self) -> Box<dyn Editor> {
+    fn editor(params: Arc<ChorusParams>) -> Box<dyn Editor> {
         GridLayout::build(vec![
             widgets(vec![
                 knob(P::Delay, "Delay"),
@@ -304,7 +306,7 @@ impl PluginLogic for Chorus {
         ])
         .with_title("CHORUS")
         .with_cols(6)
-        .into_editor(&self.params)
+        .into_editor(&params)
     }
 }
 

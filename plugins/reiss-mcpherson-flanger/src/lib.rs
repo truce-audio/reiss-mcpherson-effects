@@ -137,6 +137,8 @@ fn lfo(phase: f32, waveform: Waveform) -> f32 {
 }
 
 impl PluginLogic for Flanger {
+    type Params = FlangerParams;
+
     fn reset(&mut self, sample_rate: f64, _max_block_size: usize) {
         #[allow(clippy::cast_possible_truncation)]
         let sr = sample_rate as f32;
@@ -274,7 +276,7 @@ impl PluginLogic for Flanger {
         ProcessStatus::Normal
     }
 
-    fn editor(&self) -> Box<dyn Editor> {
+    fn editor(params: Arc<FlangerParams>) -> Box<dyn Editor> {
         GridLayout::build(vec![
             widgets(vec![
                 knob(P::Delay, "Delay"),
@@ -292,7 +294,7 @@ impl PluginLogic for Flanger {
         ])
         .with_title("FLANGER")
         .with_cols(6)
-        .into_editor(&self.params)
+        .into_editor(&params)
     }
 }
 

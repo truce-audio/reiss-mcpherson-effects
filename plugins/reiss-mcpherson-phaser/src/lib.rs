@@ -184,6 +184,8 @@ impl Phaser {
 }
 
 impl PluginLogic for Phaser {
+    type Params = PhaserParams;
+
     fn reset(&mut self, sample_rate: f64, _max_block_size: usize) {
         #[allow(clippy::cast_possible_truncation)]
         {
@@ -285,7 +287,7 @@ impl PluginLogic for Phaser {
         ProcessStatus::Normal
     }
 
-    fn editor(&self) -> Box<dyn Editor> {
+    fn editor(params: Arc<PhaserParams>) -> Box<dyn Editor> {
         GridLayout::build(vec![
             widgets(vec![
                 knob(P::Depth, "Depth"),
@@ -301,7 +303,7 @@ impl PluginLogic for Phaser {
             ]),
         ])
         .with_title("PHASER")
-        .into_editor(&self.params)
+        .into_editor(&params)
     }
 }
 
