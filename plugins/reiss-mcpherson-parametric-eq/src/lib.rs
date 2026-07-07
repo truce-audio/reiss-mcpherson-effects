@@ -270,3 +270,25 @@ truce::plugin! {
     logic: ParametricEq,
     params: ParametricEqParams,
 }
+
+
+truce::enable_rt_paranoid!();
+
+#[cfg(test)]
+mod rt_paranoid_tests {
+    use super::*;
+    use std::time::Duration;
+    use truce_test::{InputSource, assert_realtime_clean, driver};
+
+    /// `process` makes no allocation, free, or truce-typed lock on the audio
+    /// thread. Meaningful under `--features rt-paranoid`; vacuous otherwise.
+    #[test]
+    fn process_is_realtime_clean() {
+        assert_realtime_clean(|| {
+            driver!(Plugin)
+                .duration(Duration::from_millis(40))
+                .input(InputSource::Constant(0.5))
+                .run()
+        });
+    }
+}

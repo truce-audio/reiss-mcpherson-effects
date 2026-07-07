@@ -25,6 +25,7 @@ au = ["dep:truce-au"]
 standalone = ["dep:truce-standalone"]
 standalone-playback = ["standalone", "truce-standalone/playback"]
 shell = ["truce/shell"]
+rt-paranoid = ["truce/rt-paranoid"]
 
 [dependencies]
 truce = { workspace = true }
@@ -47,3 +48,6 @@ fastrand = "2"
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+truce-test = { workspace = true }
