@@ -54,8 +54,9 @@ pub struct VibratoParams {
     pub interp: EnumParam<Interpolation>,
 }
 
-pub struct Vibrato {
-    params: Arc<VibratoParams>,
+pub struct Vibrato;
+
+pub struct VibratoDsp {
     sample_rate: f32,
     buffer: Vec<Vec<f32>>,
     buffer_len: usize,
@@ -63,10 +64,9 @@ pub struct Vibrato {
     lfo_phase: f32,
 }
 
-impl Vibrato {
-    pub fn new(params: Arc<VibratoParams>) -> Self {
+impl Default for VibratoDsp {
+    fn default() -> Self {
         Self {
-            params,
             sample_rate: 44_100.0,
             buffer: Vec::new(),
             buffer_len: 1,
@@ -107,35 +107,35 @@ fn lfo(phase: f32, waveform: Waveform) -> f32 {
 
 impl PluginLogic for Vibrato {
     type Params = VibratoParams;
+    type DspState = VibratoDsp;
 
-    fn reset(&mut self, sample_rate: f64, _max_block_size: usize) {
+    fn reset(state: &mut Self::DspState, _params: &Self::Params, config: &AudioConfig) {
         #[allow(clippy::cast_possible_truncation)]
-        let sr = sample_rate as f32;
-        self.sample_rate = sr;
-        self.params.set_sample_rate(sample_rate);
-        self.params.snap_smoothers();
+        let sr = config.sample_rate as f32;
+        state.sample_rate = sr;
 
         #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         let len = (MAX_WIDTH_SECS * sr) as usize + 1;
-        self.buffer_len = len.max(4);
-        self.buffer = vec![vec![0.0; self.buffer_len]; 2];
-        self.write_pos = 0;
-        self.lfo_phase = 0.0;
+        state.buffer_len = len.max(4);
+        state.buffer = vec![vec![0.0; state.buffer_len]; 2];
+        state.write_pos = 0;
+        state.lfo_phase = 0.0;
     }
 
     fn process(
-        &mut self,
+        state: &mut Self::DspState,
+        params: &Self::Params,
         buffer: &mut AudioBuffer,
         _events: &EventList,
         _context: &mut ProcessContext,
     ) -> ProcessStatus {
         let total = buffer.num_samples();
-        let buf_len = self.buffer_len;
+        let buf_len = state.buffer_len;
         #[allow(clippy::cast_precision_loss)]
         let buf_len_f = buf_len as f32;
-        let waveform = self.params.waveform.value();
-        let interp = self.params.interp.value();
-        let num_ch = buffer.channels().min(self.buffer.len());
+        let waveform = params.waveform.value();
+        let interp = params.interp.value();
+        let num_ch = buffer.channels().min(state.buffer.len());
 
         let mut width = [0.0_f32; MAX_BLOCK];
         let mut rate = [0.0_f32; MAX_BLOCK];
@@ -146,8 +146,8 @@ impl PluginLogic for Vibrato {
 
             // Slice-based read advances each smoother by `n`. See
             // flanger for the rationale.
-            self.params.width.read_into(&mut width[..n]);
-            self.params.rate.read_into(&mut rate[..n]);
+            params.width.read_into(&mut width[..n]);
+            params.rate.read_into(&mut rate[..n]);
 
             // Precompute the read trajectory once - channels share
             // it, and the inner loop becomes pure stack-array reads.
@@ -155,8 +155,8 @@ impl PluginLogic for Vibrato {
             let mut frac_arr = [0.0_f32; MAX_BLOCK];
             let mut write_idx = [0usize; MAX_BLOCK];
             for i in 0..n {
-                let delay_samples = width[i] * lfo(self.lfo_phase, waveform) * self.sample_rate;
-                let write = self.write_pos;
+                let delay_samples = width[i] * lfo(state.lfo_phase, waveform) * state.sample_rate;
+                let write = state.write_pos;
                 #[allow(clippy::cast_precision_loss)]
                 let read_pos =
                     (write as f32 - delay_samples + buf_len_f - 1.0).rem_euclid(buf_len_f);
@@ -165,19 +165,19 @@ impl PluginLogic for Vibrato {
                 read_idx[i] = r0;
                 frac_arr[i] = read_pos - read_pos.floor();
                 write_idx[i] = write;
-                self.write_pos += 1;
-                if self.write_pos >= buf_len {
-                    self.write_pos -= buf_len;
+                state.write_pos += 1;
+                if state.write_pos >= buf_len {
+                    state.write_pos -= buf_len;
                 }
-                self.lfo_phase += rate[i] / self.sample_rate;
-                if self.lfo_phase >= 1.0 {
-                    self.lfo_phase -= 1.0;
+                state.lfo_phase += rate[i] / state.sample_rate;
+                if state.lfo_phase >= 1.0 {
+                    state.lfo_phase -= 1.0;
                 }
             }
 
             for ch in 0..num_ch {
                 let (inp, out) = buffer.io(ch);
-                let line = &mut self.buffer[ch];
+                let line = &mut state.buffer[ch];
                 for i in 0..n {
                     let idx = offset + i;
                     let in_sample = inp[idx];
@@ -231,7 +231,6 @@ truce::plugin! {
     logic: Vibrato,
     params: VibratoParams,
 }
-
 
 truce::enable_rt_paranoid!();
 

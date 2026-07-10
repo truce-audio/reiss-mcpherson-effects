@@ -101,8 +101,9 @@ impl ShelfFilter {
     }
 }
 
-pub struct Panning {
-    params: Arc<PanningParams>,
+pub struct Panning;
+
+pub struct PanningDsp {
     sample_rate: f32,
     max_delay_samples: usize,
     delay_l: Delay,
@@ -111,10 +112,9 @@ pub struct Panning {
     filter_r: ShelfFilter,
 }
 
-impl Panning {
-    pub fn new(params: Arc<PanningParams>) -> Self {
+impl Default for PanningDsp {
+    fn default() -> Self {
         Self {
-            params,
             sample_rate: 44_100.0,
             max_delay_samples: 1,
             delay_l: Delay::new(1),
@@ -127,24 +127,30 @@ impl Panning {
 
 impl PluginLogic for Panning {
     type Params = PanningParams;
+    type DspState = PanningDsp;
 
-    fn reset(&mut self, sample_rate: f64, _max_block_size: usize) {
+    fn bus_layouts() -> Vec<BusLayout> {
+        // Stereo only: an auto-panner positions the signal across the L/R
+        // field, which mono has no room for.
+        vec![BusLayout::stereo()]
+    }
+
+    fn reset(state: &mut Self::DspState, _params: &Self::Params, config: &AudioConfig) {
         #[allow(clippy::cast_possible_truncation)]
-        let sr = sample_rate as f32;
-        self.sample_rate = sr;
+        let sr = config.sample_rate as f32;
+        state.sample_rate = sr;
         #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         let len = (1e-3 * sr) as usize;
-        self.max_delay_samples = len.max(1);
-        self.delay_l = Delay::new(self.max_delay_samples);
-        self.delay_r = Delay::new(self.max_delay_samples);
-        self.filter_l.reset();
-        self.filter_r.reset();
-        self.params.set_sample_rate(sample_rate);
-        self.params.snap_smoothers();
+        state.max_delay_samples = len.max(1);
+        state.delay_l = Delay::new(state.max_delay_samples);
+        state.delay_r = Delay::new(state.max_delay_samples);
+        state.filter_l.reset();
+        state.filter_r.reset();
     }
 
     fn process(
-        &mut self,
+        state: &mut Self::DspState,
+        params: &Self::Params,
         buffer: &mut AudioBuffer,
         _events: &EventList,
         _context: &mut ProcessContext,
@@ -153,10 +159,10 @@ impl PluginLogic for Panning {
             return ProcessStatus::Normal;
         }
         let n = buffer.num_samples();
-        let method = self.params.method.value();
+        let method = params.method.value();
         #[allow(clippy::cast_precision_loss)]
-        let max_delay_f = self.max_delay_samples as f32;
-        let sr = self.sample_rate;
+        let max_delay_f = state.max_delay_samples as f32;
+        let sr = state.sample_rate;
         let hp = std::f32::consts::FRAC_PI_2;
 
         match method {
@@ -166,7 +172,7 @@ impl PluginLogic for Panning {
                 let theta = 30.0_f32.to_radians();
                 let (st, ct) = theta.sin_cos();
                 for i in 0..n {
-                    let pan = self.params.pan.read();
+                    let pan = params.pan.read();
                     let phi = -pan * theta;
                     let (sp, cp) = phi.sin_cos();
                     let gain_l = cp * st + sp * ct;
@@ -177,10 +183,10 @@ impl PluginLogic for Panning {
                     let delay_r = max_delay_f * (1.0 - delay_factor);
 
                     let in_sample = buffer.io(0).0[i];
-                    self.delay_l.write(in_sample);
-                    self.delay_r.write(in_sample);
-                    buffer.io(0).1[i] = self.delay_l.read(delay_l) * gain_l * norm;
-                    buffer.io(1).1[i] = self.delay_r.read(delay_r) * gain_r * norm;
+                    state.delay_l.write(in_sample);
+                    state.delay_r.write(in_sample);
+                    buffer.io(0).1[i] = state.delay_l.read(delay_l) * gain_l * norm;
+                    buffer.io(1).1[i] = state.delay_r.read(delay_r) * gain_r * norm;
                 }
             }
             Method::ItdIld => {
@@ -198,20 +204,20 @@ impl PluginLogic for Panning {
                 };
 
                 for i in 0..n {
-                    let pan = self.params.pan.read();
+                    let pan = params.pan.read();
                     let phi = pan * theta;
                     let d_l = td(phi + hp);
                     let d_r = td(phi - hp);
-                    self.filter_l.update(phi + hp, head_factor_shelf);
-                    self.filter_r.update(phi - hp, head_factor_shelf);
+                    state.filter_l.update(phi + hp, head_factor_shelf);
+                    state.filter_r.update(phi - hp, head_factor_shelf);
 
                     let in_sample = buffer.io(0).0[i];
-                    self.delay_l.write(in_sample);
-                    self.delay_r.write(in_sample);
-                    let dl = self.delay_l.read(d_l);
-                    let dr = self.delay_r.read(d_r);
-                    buffer.io(0).1[i] = self.filter_l.process(dl);
-                    buffer.io(1).1[i] = self.filter_r.process(dr);
+                    state.delay_l.write(in_sample);
+                    state.delay_r.write(in_sample);
+                    let dl = state.delay_l.read(d_l);
+                    let dr = state.delay_r.read(d_r);
+                    buffer.io(0).1[i] = state.filter_l.process(dl);
+                    buffer.io(1).1[i] = state.filter_r.process(dr);
                 }
             }
         }
@@ -234,7 +240,6 @@ truce::plugin! {
     logic: Panning,
     params: PanningParams,
 }
-
 
 truce::enable_rt_paranoid!();
 

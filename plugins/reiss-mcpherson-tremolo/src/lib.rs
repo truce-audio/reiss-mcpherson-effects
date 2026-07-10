@@ -48,16 +48,16 @@ pub struct TremoloParams {
     pub waveform: EnumParam<Waveform>,
 }
 
-pub struct Tremolo {
-    params: Arc<TremoloParams>,
+pub struct Tremolo;
+
+pub struct TremoloDsp {
     inv_sr: f32,
     lfo_phase: f32,
 }
 
-impl Tremolo {
-    pub fn new(params: Arc<TremoloParams>) -> Self {
+impl Default for TremoloDsp {
+    fn default() -> Self {
         Self {
-            params,
             inv_sr: 1.0 / 44_100.0,
             lfo_phase: 0.0,
         }
@@ -115,15 +115,14 @@ fn lfo(phase: f32, waveform: Waveform) -> f32 {
 
 impl PluginLogic for Tremolo {
     type Params = TremoloParams;
+    type DspState = TremoloDsp;
 
-    fn reset(&mut self, sample_rate: f64, _max_block_size: usize) {
+    fn reset(state: &mut Self::DspState, _params: &Self::Params, config: &AudioConfig) {
         #[allow(clippy::cast_possible_truncation)]
         {
-            self.inv_sr = 1.0 / sample_rate as f32;
+            state.inv_sr = 1.0 / config.sample_rate as f32;
         }
-        self.params.set_sample_rate(sample_rate);
-        self.params.snap_smoothers();
-        self.lfo_phase = 0.0;
+        state.lfo_phase = 0.0;
     }
 
     // Hot-path loops index multiple stack arrays (gain, depth, rate,
@@ -131,13 +130,14 @@ impl PluginLogic for Tremolo {
     // would obscure the channel-major shape we're optimising for.
     #[allow(clippy::needless_range_loop)]
     fn process(
-        &mut self,
+        state: &mut Self::DspState,
+        params: &Self::Params,
         buffer: &mut AudioBuffer,
         _events: &EventList,
         _context: &mut ProcessContext,
     ) -> ProcessStatus {
         let total = buffer.num_samples();
-        let waveform = self.params.waveform.value();
+        let waveform = params.waveform.value();
         let num_ch = buffer.channels();
 
         // Walk the buffer in MAX_BLOCK chunks. Per chunk: one
@@ -153,14 +153,14 @@ impl PluginLogic for Tremolo {
         while offset < total {
             let n = (total - offset).min(MAX_BLOCK);
 
-            self.params.depth.read_into(&mut depth[..n]);
-            self.params.rate.read_into(&mut rate[..n]);
+            params.depth.read_into(&mut depth[..n]);
+            params.rate.read_into(&mut rate[..n]);
             for i in 0..n {
-                let m = lfo(self.lfo_phase, waveform);
+                let m = lfo(state.lfo_phase, waveform);
                 gain[i] = 1.0 - depth[i] + depth[i] * m;
-                self.lfo_phase += rate[i] * self.inv_sr;
-                if self.lfo_phase >= 1.0 {
-                    self.lfo_phase -= 1.0;
+                state.lfo_phase += rate[i] * state.inv_sr;
+                if state.lfo_phase >= 1.0 {
+                    state.lfo_phase -= 1.0;
                 }
             }
 
@@ -193,7 +193,6 @@ truce::plugin! {
     logic: Tremolo,
     params: TremoloParams,
 }
-
 
 truce::enable_rt_paranoid!();
 

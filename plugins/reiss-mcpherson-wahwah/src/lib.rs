@@ -189,8 +189,9 @@ fn update(filter: &mut Biquad, freq_hz: f64, q: f64, gain_lin: f64, ty: FilterTy
     }
 }
 
-pub struct WahWah {
-    params: Arc<WahWahParams>,
+pub struct WahWah;
+
+pub struct WahWahDsp {
     sample_rate: f64,
     inv_sr: f32,
     filters: [Biquad; 2],
@@ -198,10 +199,9 @@ pub struct WahWah {
     lfo_phase: f32,
 }
 
-impl WahWah {
-    pub fn new(params: Arc<WahWahParams>) -> Self {
+impl Default for WahWahDsp {
+    fn default() -> Self {
         Self {
-            params,
             sample_rate: 44_100.0,
             inv_sr: 1.0 / 44_100.0,
             filters: Default::default(),
@@ -225,32 +225,32 @@ fn attack_release_coeff(value_s: f32, inv_sr: f32) -> f32 {
 
 impl PluginLogic for WahWah {
     type Params = WahWahParams;
+    type DspState = WahWahDsp;
 
-    fn reset(&mut self, sample_rate: f64, _max_block_size: usize) {
-        self.sample_rate = sample_rate;
+    fn reset(state: &mut Self::DspState, _params: &Self::Params, config: &AudioConfig) {
+        state.sample_rate = config.sample_rate;
         #[allow(clippy::cast_possible_truncation)]
         {
-            self.inv_sr = 1.0 / sample_rate as f32;
+            state.inv_sr = 1.0 / config.sample_rate as f32;
         }
-        self.params.set_sample_rate(sample_rate);
-        self.params.snap_smoothers();
-        for f in &mut self.filters {
+        for f in &mut state.filters {
             f.reset();
         }
-        self.envelopes = [0.0; 2];
-        self.lfo_phase = 0.0;
+        state.envelopes = [0.0; 2];
+        state.lfo_phase = 0.0;
     }
 
     fn process(
-        &mut self,
+        state: &mut Self::DspState,
+        params: &Self::Params,
         buffer: &mut AudioBuffer,
         _events: &EventList,
         _context: &mut ProcessContext,
     ) -> ProcessStatus {
         let total = buffer.num_samples();
-        let mode = self.params.mode.value();
-        let ty = self.params.filter_type.value();
-        let num_ch = buffer.channels().min(self.filters.len());
+        let mode = params.mode.value();
+        let ty = params.filter_type.value();
+        let num_ch = buffer.channels().min(state.filters.len());
         let automatic = matches!(mode, Mode::Automatic);
 
         let mut mix = [0.0_f32; MAX_BLOCK];
@@ -268,14 +268,14 @@ impl PluginLogic for WahWah {
 
             // Slice-based read advances each smoother by `n`. See
             // flanger for the rationale.
-            self.params.mix.read_into(&mut mix[..n]);
-            self.params.env_attack.read_into(&mut env_attack[..n]);
-            self.params.env_release.read_into(&mut env_release[..n]);
-            self.params.lfo_rate.read_into(&mut lfo_rate[..n]);
-            self.params.lfo_env_mix.read_into(&mut lfo_env_mix[..n]);
-            self.params.frequency.read_into(&mut manual_freq[..n]);
-            self.params.q.read_into(&mut q_arr[..n]);
-            self.params.gain.read_into(&mut gain_arr[..n]);
+            params.mix.read_into(&mut mix[..n]);
+            params.env_attack.read_into(&mut env_attack[..n]);
+            params.env_release.read_into(&mut env_release[..n]);
+            params.lfo_rate.read_into(&mut lfo_rate[..n]);
+            params.lfo_env_mix.read_into(&mut lfo_env_mix[..n]);
+            params.frequency.read_into(&mut manual_freq[..n]);
+            params.q.read_into(&mut q_arr[..n]);
+            params.gain.read_into(&mut gain_arr[..n]);
 
             // Pre-compute attack/release coefficients and the
             // shared LFO contribution so the inner channel-major
@@ -284,21 +284,21 @@ impl PluginLogic for WahWah {
             let mut release_co = [0.0_f32; MAX_BLOCK];
             let mut lfo_norm = [0.0_f32; MAX_BLOCK];
             for i in 0..n {
-                attack_co[i] = attack_release_coeff(env_attack[i], self.inv_sr);
-                release_co[i] = attack_release_coeff(env_release[i], self.inv_sr);
+                attack_co[i] = attack_release_coeff(env_attack[i], state.inv_sr);
+                release_co[i] = attack_release_coeff(env_release[i], state.inv_sr);
                 if automatic {
-                    lfo_norm[i] = 0.5 + 0.5 * (std::f32::consts::TAU * self.lfo_phase).sin();
-                    self.lfo_phase += lfo_rate[i] * self.inv_sr;
-                    if self.lfo_phase >= 1.0 {
-                        self.lfo_phase -= 1.0;
+                    lfo_norm[i] = 0.5 + 0.5 * (std::f32::consts::TAU * state.lfo_phase).sin();
+                    state.lfo_phase += lfo_rate[i] * state.inv_sr;
+                    if state.lfo_phase >= 1.0 {
+                        state.lfo_phase -= 1.0;
                     }
                 }
             }
 
             for ch in 0..num_ch {
                 let (inp, out) = buffer.io(ch);
-                let filter = &mut self.filters[ch];
-                let mut env = self.envelopes[ch];
+                let filter = &mut state.filters[ch];
+                let mut env = state.envelopes[ch];
                 for i in 0..n {
                     let idx = offset + i;
                     let in_sample = inp[idx];
@@ -324,14 +324,14 @@ impl PluginLogic for WahWah {
                         q,
                         gain_lin,
                         ty,
-                        self.sample_rate,
+                        state.sample_rate,
                     );
 
                     #[allow(clippy::cast_possible_truncation)]
                     let filtered = filter.process(f64::from(in_sample)) as f32;
                     out[idx] = in_sample + mix[i] * (filtered - in_sample);
                 }
-                self.envelopes[ch] = env;
+                state.envelopes[ch] = env;
             }
 
             offset += n;
@@ -373,7 +373,6 @@ truce::plugin! {
     logic: WahWah,
     params: WahWahParams,
 }
-
 
 truce::enable_rt_paranoid!();
 

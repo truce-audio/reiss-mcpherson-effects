@@ -289,17 +289,17 @@ impl PhaseVocoder {
     }
 }
 
-pub struct PitchShift {
-    params: Arc<PitchShiftParams>,
+pub struct PitchShift;
+
+pub struct PitchShiftDsp {
     planner: RealFftPlanner<f32>,
     pv: Option<PhaseVocoder>,
     num_channels: usize,
 }
 
-impl PitchShift {
-    pub fn new(params: Arc<PitchShiftParams>) -> Self {
+impl Default for PitchShiftDsp {
+    fn default() -> Self {
         Self {
-            params,
             planner: RealFftPlanner::<f32>::new(),
             pv: None,
             num_channels: 2,
@@ -309,34 +309,34 @@ impl PitchShift {
 
 impl PluginLogic for PitchShift {
     type Params = PitchShiftParams;
+    type DspState = PitchShiftDsp;
 
-    fn reset(&mut self, sample_rate: f64, _max_block_size: usize) {
-        self.params.set_sample_rate(sample_rate);
-        self.params.snap_smoothers();
-        self.pv = Some(PhaseVocoder::new(&mut self.planner, self.num_channels));
+    fn reset(state: &mut Self::DspState, _params: &Self::Params, _config: &AudioConfig) {
+        state.pv = Some(PhaseVocoder::new(&mut state.planner, state.num_channels));
     }
 
     fn process(
-        &mut self,
+        state: &mut Self::DspState,
+        params: &Self::Params,
         buffer: &mut AudioBuffer,
         _events: &EventList,
         _context: &mut ProcessContext,
     ) -> ProcessStatus {
         let channels = buffer.channels();
-        self.num_channels = channels.max(1);
-        let target_size = self.params.fft_size.value().samples();
-        let target_overlap = self.params.hop.value().overlap();
-        let target_window = self.params.window.value();
+        state.num_channels = channels.max(1);
+        let target_size = params.fft_size.value().samples();
+        let target_overlap = params.hop.value().overlap();
+        let target_window = params.window.value();
 
-        let pv = self
+        let pv = state
             .pv
-            .get_or_insert_with(|| PhaseVocoder::new(&mut self.planner, self.num_channels));
+            .get_or_insert_with(|| PhaseVocoder::new(&mut state.planner, state.num_channels));
         pv.reconfigure(
-            &mut self.planner,
+            &mut state.planner,
             target_size,
             target_overlap,
             target_window,
-            self.num_channels,
+            state.num_channels,
         );
 
         let n = buffer.num_samples();
@@ -349,7 +349,7 @@ impl PluginLogic for PitchShift {
         // recipe — guarantees the per-bin phase increment is an
         // integer multiple of the FFT bin spacing, eliminating
         // long-running phase drift between successive hops.
-        let shift_st = self.params.shift.read_after(n);
+        let shift_st = params.shift.read_after(n);
         let raw_factor = 2f32.powf(shift_st / 12.0);
         let ratio = (raw_factor * hop_f).round() / hop_f;
         let ratio = ratio.max(1e-3);
@@ -532,7 +532,6 @@ mod tests {
         }
     }
 }
-
 
 truce::enable_rt_paranoid!();
 

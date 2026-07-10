@@ -71,17 +71,17 @@ pub struct CompressorParams {
     pub bypass: BoolParam,
 }
 
-pub struct Compressor {
-    params: Arc<CompressorParams>,
+pub struct Compressor;
+
+pub struct CompressorDsp {
     inv_sr: f32,
     input_level: f32,
     yl_prev: f32,
 }
 
-impl Compressor {
-    pub fn new(params: Arc<CompressorParams>) -> Self {
+impl Default for CompressorDsp {
+    fn default() -> Self {
         Self {
-            params,
             inv_sr: 1.0 / 44_100.0,
             input_level: 0.0,
             yl_prev: 0.0,
@@ -101,25 +101,25 @@ fn attack_release_coeff(value_s: f32, inv_sr: f32) -> f32 {
 
 impl PluginLogic for Compressor {
     type Params = CompressorParams;
+    type DspState = CompressorDsp;
 
-    fn reset(&mut self, sample_rate: f64, _max_block_size: usize) {
+    fn reset(state: &mut Self::DspState, _params: &Self::Params, config: &AudioConfig) {
         #[allow(clippy::cast_possible_truncation)]
         {
-            self.inv_sr = 1.0 / sample_rate as f32;
+            state.inv_sr = 1.0 / config.sample_rate as f32;
         }
-        self.params.set_sample_rate(sample_rate);
-        self.params.snap_smoothers();
-        self.input_level = 0.0;
-        self.yl_prev = 0.0;
+        state.input_level = 0.0;
+        state.yl_prev = 0.0;
     }
 
     fn process(
-        &mut self,
+        state: &mut Self::DspState,
+        params: &Self::Params,
         buffer: &mut AudioBuffer,
         _events: &EventList,
         _context: &mut ProcessContext,
     ) -> ProcessStatus {
-        if self.params.bypass.value() {
+        if params.bypass.value() {
             // Copy input → output without touching the dynamics
             // state; on the next un-bypassed block the envelope
             // continues smoothly from `input_level`.
@@ -135,16 +135,16 @@ impl PluginLogic for Compressor {
         if num_ch == 0 {
             return ProcessStatus::Normal;
         }
-        let expander = matches!(self.params.mode.value(), Mode::Expander);
+        let expander = matches!(params.mode.value(), Mode::Expander);
         #[allow(clippy::cast_precision_loss)]
         let inv_ch = 1.0_f32 / num_ch as f32;
 
         for i in 0..n {
-            let t = self.params.threshold.read();
-            let r = self.params.ratio.read();
-            let alpha_a = attack_release_coeff(self.params.attack.read(), self.inv_sr);
-            let alpha_r = attack_release_coeff(self.params.release.read(), self.inv_sr);
-            let makeup = self.params.makeup.read();
+            let t = params.threshold.read();
+            let r = params.ratio.read();
+            let alpha_a = attack_release_coeff(params.attack.read(), state.inv_sr);
+            let alpha_r = attack_release_coeff(params.release.read(), state.inv_sr);
+            let makeup = params.makeup.read();
 
             // Mono mixdown of the input for detection.
             let mut mix = 0.0_f32;
@@ -159,16 +159,16 @@ impl PluginLogic for Compressor {
                 // recipe to suppress the gain pumping that an instant
                 // RMS would cause on noise-gate / expander curves.
                 const AVERAGE_FACTOR: f32 = 0.9999;
-                self.input_level =
-                    AVERAGE_FACTOR * self.input_level + (1.0 - AVERAGE_FACTOR) * in_squared;
+                state.input_level =
+                    AVERAGE_FACTOR * state.input_level + (1.0 - AVERAGE_FACTOR) * in_squared;
             } else {
-                self.input_level = in_squared;
+                state.input_level = in_squared;
             }
 
-            let xg = if self.input_level <= 1e-6 {
+            let xg = if state.input_level <= 1e-6 {
                 -60.0
             } else {
-                10.0 * self.input_level.log10()
+                10.0 * state.input_level.log10()
             };
 
             let (yg, xl);
@@ -184,19 +184,19 @@ impl PluginLogic for Compressor {
             // for compressors / release for expanders, mirrored on
             // the falling side.
             let yl = if expander {
-                if xl < self.yl_prev {
-                    alpha_a * self.yl_prev + (1.0 - alpha_a) * xl
+                if xl < state.yl_prev {
+                    alpha_a * state.yl_prev + (1.0 - alpha_a) * xl
                 } else {
-                    alpha_r * self.yl_prev + (1.0 - alpha_r) * xl
+                    alpha_r * state.yl_prev + (1.0 - alpha_r) * xl
                 }
-            } else if xl > self.yl_prev {
-                alpha_a * self.yl_prev + (1.0 - alpha_a) * xl
+            } else if xl > state.yl_prev {
+                alpha_a * state.yl_prev + (1.0 - alpha_a) * xl
             } else {
-                alpha_r * self.yl_prev + (1.0 - alpha_r) * xl
+                alpha_r * state.yl_prev + (1.0 - alpha_r) * xl
             };
 
             let control = 10f32.powf((makeup - yl) * 0.05);
-            self.yl_prev = yl;
+            state.yl_prev = yl;
 
             for ch in 0..num_ch {
                 let (inp, out) = buffer.io(ch);
@@ -230,7 +230,6 @@ truce::plugin! {
     logic: Compressor,
     params: CompressorParams,
 }
-
 
 truce::enable_rt_paranoid!();
 

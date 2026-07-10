@@ -274,18 +274,18 @@ impl Stft {
     }
 }
 
-pub struct Robotization {
-    params: Arc<RobotParams>,
+pub struct Robotization;
+
+pub struct RobotizationDsp {
     planner: RealFftPlanner<f32>,
     stft: Option<Stft>,
     num_channels: usize,
     rng: fastrand::Rng,
 }
 
-impl Robotization {
-    pub fn new(params: Arc<RobotParams>) -> Self {
+impl Default for RobotizationDsp {
+    fn default() -> Self {
         Self {
-            params,
             planner: RealFftPlanner::<f32>::new(),
             stft: None,
             num_channels: 2,
@@ -296,36 +296,36 @@ impl Robotization {
 
 impl PluginLogic for Robotization {
     type Params = RobotParams;
+    type DspState = RobotizationDsp;
 
-    fn reset(&mut self, sample_rate: f64, _max_block_size: usize) {
-        self.params.set_sample_rate(sample_rate);
-        self.params.snap_smoothers();
-        self.stft = Some(Stft::new(&mut self.planner, self.num_channels));
+    fn reset(state: &mut Self::DspState, _params: &Self::Params, _config: &AudioConfig) {
+        state.stft = Some(Stft::new(&mut state.planner, state.num_channels));
     }
 
     fn process(
-        &mut self,
+        state: &mut Self::DspState,
+        params: &Self::Params,
         buffer: &mut AudioBuffer,
         _events: &EventList,
         _context: &mut ProcessContext,
     ) -> ProcessStatus {
         let channels = buffer.channels();
-        self.num_channels = channels.max(1);
+        state.num_channels = channels.max(1);
 
-        let target_size = self.params.fft_size.value().samples();
-        let target_overlap = self.params.hop.value().overlap();
-        let target_window = self.params.window.value();
-        let effect = self.params.effect.value();
+        let target_size = params.fft_size.value().samples();
+        let target_overlap = params.hop.value().overlap();
+        let target_window = params.window.value();
+        let effect = params.effect.value();
 
-        let stft = self
+        let stft = state
             .stft
-            .get_or_insert_with(|| Stft::new(&mut self.planner, self.num_channels));
+            .get_or_insert_with(|| Stft::new(&mut state.planner, state.num_channels));
         stft.reconfigure(
-            &mut self.planner,
+            &mut state.planner,
             target_size,
             target_overlap,
             target_window,
-            self.num_channels,
+            state.num_channels,
         );
 
         let n = buffer.num_samples();
@@ -372,7 +372,7 @@ impl PluginLogic for Robotization {
 
                     stft.analysis(ch);
                     let _ = stft.fwd.process(&mut stft.time, &mut stft.freq);
-                    modify(effect, &mut stft.freq, fft_size, &mut self.rng);
+                    modify(effect, &mut stft.freq, fft_size, &mut state.rng);
                     let _ = stft.inv.process(&mut stft.freq, &mut stft.time);
                     stft.synthesis(ch);
 
@@ -439,7 +439,6 @@ truce::plugin! {
     logic: Robotization,
     params: RobotParams,
 }
-
 
 truce::enable_rt_paranoid!();
 

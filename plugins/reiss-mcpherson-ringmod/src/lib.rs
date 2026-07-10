@@ -46,16 +46,16 @@ pub struct RingModParams {
     pub waveform: EnumParam<Waveform>,
 }
 
-pub struct RingMod {
-    params: Arc<RingModParams>,
+pub struct RingMod;
+
+pub struct RingModDsp {
     inv_sr: f32,
     lfo_phase: f32,
 }
 
-impl RingMod {
-    pub fn new(params: Arc<RingModParams>) -> Self {
+impl Default for RingModDsp {
+    fn default() -> Self {
         Self {
-            params,
             inv_sr: 1.0 / 44_100.0,
             lfo_phase: 0.0,
         }
@@ -111,26 +111,26 @@ fn lfo(phase: f32, waveform: Waveform) -> f32 {
 
 impl PluginLogic for RingMod {
     type Params = RingModParams;
+    type DspState = RingModDsp;
 
-    fn reset(&mut self, sample_rate: f64, _max_block_size: usize) {
+    fn reset(state: &mut Self::DspState, _params: &Self::Params, config: &AudioConfig) {
         #[allow(clippy::cast_possible_truncation)]
         {
-            self.inv_sr = 1.0 / sample_rate as f32;
+            state.inv_sr = 1.0 / config.sample_rate as f32;
         }
-        self.params.set_sample_rate(sample_rate);
-        self.params.snap_smoothers();
-        self.lfo_phase = 0.0;
+        state.lfo_phase = 0.0;
     }
 
     #[allow(clippy::needless_range_loop)]
     fn process(
-        &mut self,
+        state: &mut Self::DspState,
+        params: &Self::Params,
         buffer: &mut AudioBuffer,
         _events: &EventList,
         _context: &mut ProcessContext,
     ) -> ProcessStatus {
         let total = buffer.num_samples();
-        let waveform = self.params.waveform.value();
+        let waveform = params.waveform.value();
         let num_ch = buffer.channels();
 
         let mut depth = [0.0_f32; MAX_BLOCK];
@@ -143,16 +143,16 @@ impl PluginLogic for RingMod {
 
             // Slice-based read advances each smoother by `n`. See
             // flanger for the rationale.
-            self.params.depth.read_into(&mut depth[..n]);
-            self.params.frequency.read_into(&mut freq[..n]);
+            params.depth.read_into(&mut depth[..n]);
+            params.frequency.read_into(&mut freq[..n]);
             for i in 0..n {
                 // Bipolar carrier in [-1, 1]; depth crossfades from
                 // dry (depth=0) to fully modulated (depth=1).
-                let carrier = 2.0 * lfo(self.lfo_phase, waveform) - 1.0;
+                let carrier = 2.0 * lfo(state.lfo_phase, waveform) - 1.0;
                 gain[i] = 1.0 - depth[i] + depth[i] * carrier;
-                self.lfo_phase += freq[i] * self.inv_sr;
-                if self.lfo_phase >= 1.0 {
-                    self.lfo_phase -= 1.0;
+                state.lfo_phase += freq[i] * state.inv_sr;
+                if state.lfo_phase >= 1.0 {
+                    state.lfo_phase -= 1.0;
                 }
             }
 
@@ -185,7 +185,6 @@ truce::plugin! {
     logic: RingMod,
     params: RingModParams,
 }
-
 
 truce::enable_rt_paranoid!();
 

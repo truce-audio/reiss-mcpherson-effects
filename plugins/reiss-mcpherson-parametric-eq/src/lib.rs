@@ -166,8 +166,9 @@ fn update(filter: &mut Biquad, freq_hz: f64, q: f64, gain_lin: f64, ty: FilterTy
     }
 }
 
-pub struct ParametricEq {
-    params: Arc<ParametricEqParams>,
+pub struct ParametricEq;
+
+pub struct ParametricEqDsp {
     sample_rate: f64,
     filters: [Biquad; 2],
     last_freq: f64,
@@ -176,10 +177,9 @@ pub struct ParametricEq {
     last_type: i32,
 }
 
-impl ParametricEq {
-    pub fn new(params: Arc<ParametricEqParams>) -> Self {
+impl Default for ParametricEqDsp {
+    fn default() -> Self {
         Self {
-            params,
             sample_rate: 44_100.0,
             filters: Default::default(),
             last_freq: f64::NAN,
@@ -192,25 +192,25 @@ impl ParametricEq {
 
 impl PluginLogic for ParametricEq {
     type Params = ParametricEqParams;
+    type DspState = ParametricEqDsp;
 
-    fn reset(&mut self, sample_rate: f64, _max_block_size: usize) {
-        self.sample_rate = sample_rate;
-        self.params.set_sample_rate(sample_rate);
-        self.params.snap_smoothers();
-        for f in &mut self.filters {
+    fn reset(state: &mut Self::DspState, _params: &Self::Params, config: &AudioConfig) {
+        state.sample_rate = config.sample_rate;
+        for f in &mut state.filters {
             f.reset();
         }
-        self.last_freq = f64::NAN;
+        state.last_freq = f64::NAN;
     }
 
     fn process(
-        &mut self,
+        state: &mut Self::DspState,
+        params: &Self::Params,
         buffer: &mut AudioBuffer,
         _events: &EventList,
         _context: &mut ProcessContext,
     ) -> ProcessStatus {
         let n = buffer.num_samples();
-        let ty = self.params.filter_type.value();
+        let ty = params.filter_type.value();
         // Rebuild biquad coefficients per block, not per sample - the
         // JUCE source updates them inside parameter setters, never on
         // smoothed values. Smoothing the parameter just animates the
@@ -218,30 +218,30 @@ impl PluginLogic for ParametricEq {
         // `read_after(n)` advances the smoother by the whole block so a
         // knob sweep reaches its target at the documented time even
         // though the biquad rebuilds only at block boundaries.
-        let freq = f64::from(self.params.frequency.read_after(n));
-        let q = f64::from(self.params.q.read_after(n));
-        let gain_db = f64::from(self.params.gain.read_after(n));
+        let freq = f64::from(params.frequency.read_after(n));
+        let q = f64::from(params.q.read_after(n));
+        let gain_db = f64::from(params.gain.read_after(n));
         #[allow(clippy::cast_possible_truncation)]
         let ty_idx = ty as i32;
 
-        let changed = (freq - self.last_freq).abs() > 1e-6
-            || (q - self.last_q).abs() > 1e-6
-            || (gain_db - self.last_gain_db).abs() > 1e-6
-            || ty_idx != self.last_type;
+        let changed = (freq - state.last_freq).abs() > 1e-6
+            || (q - state.last_q).abs() > 1e-6
+            || (gain_db - state.last_gain_db).abs() > 1e-6
+            || ty_idx != state.last_type;
         if changed {
             let gain_lin = 10f64.powf(gain_db * 0.05);
-            for f in &mut self.filters {
-                update(f, freq, q, gain_lin, ty, self.sample_rate);
+            for f in &mut state.filters {
+                update(f, freq, q, gain_lin, ty, state.sample_rate);
             }
-            self.last_freq = freq;
-            self.last_q = q;
-            self.last_gain_db = gain_db;
-            self.last_type = ty_idx;
+            state.last_freq = freq;
+            state.last_q = q;
+            state.last_gain_db = gain_db;
+            state.last_type = ty_idx;
         }
 
-        for ch in 0..buffer.channels().min(self.filters.len()) {
+        for ch in 0..buffer.channels().min(state.filters.len()) {
             let (inp, out) = buffer.io(ch);
-            let f = &mut self.filters[ch];
+            let f = &mut state.filters[ch];
             for i in 0..n {
                 #[allow(clippy::cast_possible_truncation)]
                 {
@@ -270,7 +270,6 @@ truce::plugin! {
     logic: ParametricEq,
     params: ParametricEqParams,
 }
-
 
 truce::enable_rt_paranoid!();
 

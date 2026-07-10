@@ -48,8 +48,9 @@ pub struct PingPongParams {
     pub mix: FloatParam,
 }
 
-pub struct PingPong {
-    params: Arc<PingPongParams>,
+pub struct PingPong;
+
+pub struct PingPongDsp {
     sample_rate: f32,
     line_l: Vec<f32>,
     line_r: Vec<f32>,
@@ -57,10 +58,9 @@ pub struct PingPong {
     write_pos: usize,
 }
 
-impl PingPong {
-    pub fn new(params: Arc<PingPongParams>) -> Self {
+impl Default for PingPongDsp {
+    fn default() -> Self {
         Self {
-            params,
             sample_rate: 44_100.0,
             line_l: Vec::new(),
             line_r: Vec::new(),
@@ -72,24 +72,30 @@ impl PingPong {
 
 impl PluginLogic for PingPong {
     type Params = PingPongParams;
+    type DspState = PingPongDsp;
 
-    fn reset(&mut self, sample_rate: f64, _max_block_size: usize) {
+    fn bus_layouts() -> Vec<BusLayout> {
+        // Stereo only: a ping-pong delay bounces taps between L and R,
+        // which needs a stereo output.
+        vec![BusLayout::stereo()]
+    }
+
+    fn reset(state: &mut Self::DspState, _params: &Self::Params, config: &AudioConfig) {
         #[allow(clippy::cast_possible_truncation)]
-        let sr = sample_rate as f32;
-        self.sample_rate = sr;
-        self.params.set_sample_rate(sample_rate);
-        self.params.snap_smoothers();
+        let sr = config.sample_rate as f32;
+        state.sample_rate = sr;
 
         #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         let len = (MAX_DELAY_SECS * sr) as usize + 1;
-        self.buffer_len = len.max(1);
-        self.line_l = vec![0.0; self.buffer_len];
-        self.line_r = vec![0.0; self.buffer_len];
-        self.write_pos = 0;
+        state.buffer_len = len.max(1);
+        state.line_l = vec![0.0; state.buffer_len];
+        state.line_r = vec![0.0; state.buffer_len];
+        state.write_pos = 0;
     }
 
     fn process(
-        &mut self,
+        state: &mut Self::DspState,
+        params: &Self::Params,
         buffer: &mut AudioBuffer,
         _events: &EventList,
         _context: &mut ProcessContext,
@@ -97,14 +103,13 @@ impl PluginLogic for PingPong {
         if buffer.channels() < 2 {
             return ProcessStatus::Normal;
         }
-        let buf_len = self.buffer_len;
+        let buf_len = state.buffer_len;
         #[allow(clippy::cast_precision_loss)]
         let buf_len_f = buf_len as f32;
-        let mut write = self.write_pos;
-        let sr = self.sample_rate;
-        let line_l = &mut self.line_l;
-        let line_r = &mut self.line_r;
-        let params = &self.params;
+        let mut write = state.write_pos;
+        let sr = state.sample_rate;
+        let line_l = &mut state.line_l;
+        let line_r = &mut state.line_r;
 
         buffer.for_each_frame::<2, _>(|frame_in: &[f32; 2], frame_out: &mut [f32; 2]| {
             let balance = params.balance.read();
@@ -146,7 +151,7 @@ impl PluginLogic for PingPong {
             }
         });
 
-        self.write_pos = write;
+        state.write_pos = write;
         ProcessStatus::Normal
     }
 
@@ -166,7 +171,6 @@ truce::plugin! {
     logic: PingPong,
     params: PingPongParams,
 }
-
 
 truce::enable_rt_paranoid!();
 

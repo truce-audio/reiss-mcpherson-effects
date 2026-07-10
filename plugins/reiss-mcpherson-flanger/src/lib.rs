@@ -85,8 +85,9 @@ pub struct FlangerParams {
     pub stereo: BoolParam,
 }
 
-pub struct Flanger {
-    params: Arc<FlangerParams>,
+pub struct Flanger;
+
+pub struct FlangerDsp {
     sample_rate: f32,
     buffer: Vec<Vec<f32>>,
     buffer_len: usize,
@@ -94,10 +95,9 @@ pub struct Flanger {
     lfo_phase: f32,
 }
 
-impl Flanger {
-    pub fn new(params: Arc<FlangerParams>) -> Self {
+impl Default for FlangerDsp {
+    fn default() -> Self {
         Self {
-            params,
             sample_rate: 44_100.0,
             buffer: Vec::new(),
             buffer_len: 1,
@@ -138,41 +138,41 @@ fn lfo(phase: f32, waveform: Waveform) -> f32 {
 
 impl PluginLogic for Flanger {
     type Params = FlangerParams;
+    type DspState = FlangerDsp;
 
-    fn reset(&mut self, sample_rate: f64, _max_block_size: usize) {
+    fn reset(state: &mut Self::DspState, _params: &Self::Params, config: &AudioConfig) {
         #[allow(clippy::cast_possible_truncation)]
-        let sr = sample_rate as f32;
-        self.sample_rate = sr;
-        self.params.set_sample_rate(sample_rate);
-        self.params.snap_smoothers();
+        let sr = config.sample_rate as f32;
+        state.sample_rate = sr;
 
         #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         let len = (MAX_DELAY_SECS * sr) as usize + 1;
-        self.buffer_len = len.max(4);
-        self.buffer = vec![vec![0.0; self.buffer_len]; 2];
-        self.write_pos = 0;
-        self.lfo_phase = 0.0;
+        state.buffer_len = len.max(4);
+        state.buffer = vec![vec![0.0; state.buffer_len]; 2];
+        state.write_pos = 0;
+        state.lfo_phase = 0.0;
     }
 
     fn process(
-        &mut self,
+        state: &mut Self::DspState,
+        params: &Self::Params,
         buffer: &mut AudioBuffer,
         _events: &EventList,
         _context: &mut ProcessContext,
     ) -> ProcessStatus {
         let total = buffer.num_samples();
-        let buf_len = self.buffer_len;
+        let buf_len = state.buffer_len;
         #[allow(clippy::cast_precision_loss)]
         let buf_len_f = buf_len as f32;
-        let waveform = self.params.waveform.value();
-        let interp = self.params.interp.value();
-        let stereo = self.params.stereo.value();
-        let invert = if self.params.inverted.value() {
+        let waveform = params.waveform.value();
+        let interp = params.interp.value();
+        let stereo = params.stereo.value();
+        let invert = if params.inverted.value() {
             -1.0_f32
         } else {
             1.0
         };
-        let num_ch = buffer.channels().min(self.buffer.len());
+        let num_ch = buffer.channels().min(state.buffer.len());
 
         let mut delay = [0.0_f32; MAX_BLOCK];
         let mut width = [0.0_f32; MAX_BLOCK];
@@ -191,11 +191,11 @@ impl PluginLogic for Flanger {
             // delay / rate values at the block boundary and producing
             // audible clicks whenever the host's block size isn't a
             // multiple of MAX_BLOCK.
-            self.params.delay.read_into(&mut delay[..n]);
-            self.params.width.read_into(&mut width[..n]);
-            self.params.depth.read_into(&mut depth[..n]);
-            self.params.feedback.read_into(&mut feedback[..n]);
-            self.params.rate.read_into(&mut rate[..n]);
+            params.delay.read_into(&mut delay[..n]);
+            params.width.read_into(&mut width[..n]);
+            params.depth.read_into(&mut depth[..n]);
+            params.feedback.read_into(&mut feedback[..n]);
+            params.rate.read_into(&mut rate[..n]);
 
             // Per-channel read trajectories so the stereo LFO
             // offset is baked into the read-position arrays once
@@ -208,16 +208,16 @@ impl PluginLogic for Flanger {
             // Advance the shared LFO phase + write head once per
             // sample, snapshotting per-channel read positions.
             for i in 0..n {
-                let write = self.write_pos;
+                let write = state.write_pos;
                 write_idx[i] = write;
                 for ch in 0..num_ch.min(2) {
                     let ph = if stereo && ch != 0 {
-                        (self.lfo_phase + 0.25).rem_euclid(1.0)
+                        (state.lfo_phase + 0.25).rem_euclid(1.0)
                     } else {
-                        self.lfo_phase
+                        state.lfo_phase
                     };
                     let delay_samples =
-                        (delay[i] + width[i] * lfo(ph, waveform)) * self.sample_rate;
+                        (delay[i] + width[i] * lfo(ph, waveform)) * state.sample_rate;
                     #[allow(clippy::cast_precision_loss)]
                     let read_pos = (write as f32 - delay_samples + buf_len_f).rem_euclid(buf_len_f);
                     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
@@ -225,19 +225,19 @@ impl PluginLogic for Flanger {
                     read_idx[ch][i] = r0;
                     frac_arr[ch][i] = read_pos - read_pos.floor();
                 }
-                self.write_pos += 1;
-                if self.write_pos >= buf_len {
-                    self.write_pos -= buf_len;
+                state.write_pos += 1;
+                if state.write_pos >= buf_len {
+                    state.write_pos -= buf_len;
                 }
-                self.lfo_phase += rate[i] / self.sample_rate;
-                if self.lfo_phase >= 1.0 {
-                    self.lfo_phase -= 1.0;
+                state.lfo_phase += rate[i] / state.sample_rate;
+                if state.lfo_phase >= 1.0 {
+                    state.lfo_phase -= 1.0;
                 }
             }
 
             for ch in 0..num_ch {
                 let (inp, out) = buffer.io(ch);
-                let line = &mut self.buffer[ch];
+                let line = &mut state.buffer[ch];
                 let read_idx = &read_idx[ch];
                 let frac_arr = &frac_arr[ch];
                 for i in 0..n {
@@ -302,7 +302,6 @@ truce::plugin! {
     logic: Flanger,
     params: FlangerParams,
 }
-
 
 truce::enable_rt_paranoid!();
 

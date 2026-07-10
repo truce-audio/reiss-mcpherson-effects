@@ -133,40 +133,33 @@ fn shape(x: f32, ty: DistortionType) -> f32 {
     }
 }
 
-pub struct Distortion {
-    params: Arc<DistortionParams>,
-    shelves: [ToneShelf; 2],
-}
+pub struct Distortion;
 
-impl Distortion {
-    pub fn new(params: Arc<DistortionParams>) -> Self {
-        Self {
-            params,
-            shelves: [ToneShelf::default(); 2],
-        }
-    }
+#[derive(Default)]
+pub struct DistortionDsp {
+    shelves: [ToneShelf; 2],
 }
 
 impl PluginLogic for Distortion {
     type Params = DistortionParams;
+    type DspState = DistortionDsp;
 
-    fn reset(&mut self, sample_rate: f64, _max_block_size: usize) {
-        self.params.set_sample_rate(sample_rate);
-        self.params.snap_smoothers();
-        for s in &mut self.shelves {
+    fn reset(state: &mut Self::DspState, _params: &Self::Params, _config: &AudioConfig) {
+        for s in &mut state.shelves {
             s.reset();
         }
     }
 
     fn process(
-        &mut self,
+        state: &mut Self::DspState,
+        params: &Self::Params,
         buffer: &mut AudioBuffer,
         _events: &EventList,
         _context: &mut ProcessContext,
     ) -> ProcessStatus {
         let total = buffer.num_samples();
-        let ty = self.params.distortion_type.value();
-        let num_ch = buffer.channels().min(self.shelves.len());
+        let ty = params.distortion_type.value();
+        let num_ch = buffer.channels().min(state.shelves.len());
 
         let mut in_gain = [0.0_f32; MAX_BLOCK];
         let mut out_gain = [0.0_f32; MAX_BLOCK];
@@ -180,13 +173,13 @@ impl PluginLogic for Distortion {
             // Tone shelf rebuilds once per chunk - recomputing at
             // sample rate buys nothing audible at PI*0.01 cut-off
             // and we still need the smoother advanced by `n`.
-            let tone = self.params.tone.read_after(n);
-            for s in &mut self.shelves {
+            let tone = params.tone.read_after(n);
+            for s in &mut state.shelves {
                 s.update(tone);
             }
 
-            self.params.input_gain.read_into(&mut in_gain[..n]);
-            self.params.output_gain.read_into(&mut out_gain[..n]);
+            params.input_gain.read_into(&mut in_gain[..n]);
+            params.output_gain.read_into(&mut out_gain[..n]);
             for i in 0..n {
                 in_lin[i] = 10f32.powf(in_gain[i] * 0.05);
                 out_lin[i] = 10f32.powf(out_gain[i] * 0.05);
@@ -194,7 +187,7 @@ impl PluginLogic for Distortion {
 
             for ch in 0..num_ch {
                 let (inp, out) = buffer.io(ch);
-                let s = &mut self.shelves[ch];
+                let s = &mut state.shelves[ch];
                 for i in 0..n {
                     let idx = offset + i;
                     let shaped = shape(inp[idx] * in_lin[i], ty);
@@ -225,7 +218,6 @@ truce::plugin! {
     logic: Distortion,
     params: DistortionParams,
 }
-
 
 truce::enable_rt_paranoid!();
 

@@ -79,8 +79,9 @@ pub struct ChorusParams {
     pub stereo: BoolParam,
 }
 
-pub struct Chorus {
-    params: Arc<ChorusParams>,
+pub struct Chorus;
+
+pub struct ChorusDsp {
     sample_rate: f32,
     buffer: Vec<Vec<f32>>,
     buffer_len: usize,
@@ -88,10 +89,9 @@ pub struct Chorus {
     lfo_phase: f32,
 }
 
-impl Chorus {
-    pub fn new(params: Arc<ChorusParams>) -> Self {
+impl Default for ChorusDsp {
+    fn default() -> Self {
         Self {
-            params,
             sample_rate: 44_100.0,
             buffer: Vec::new(),
             buffer_len: 1,
@@ -160,39 +160,39 @@ fn sample_at(line: &[f32], pos: f32, buf_len: usize, interp: Interpolation) -> f
 
 impl PluginLogic for Chorus {
     type Params = ChorusParams;
+    type DspState = ChorusDsp;
 
-    fn reset(&mut self, sample_rate: f64, _max_block_size: usize) {
+    fn reset(state: &mut Self::DspState, _params: &Self::Params, config: &AudioConfig) {
         #[allow(clippy::cast_possible_truncation)]
-        let sr = sample_rate as f32;
-        self.sample_rate = sr;
-        self.params.set_sample_rate(sample_rate);
-        self.params.snap_smoothers();
+        let sr = config.sample_rate as f32;
+        state.sample_rate = sr;
 
         #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         let len = (MAX_DELAY_SECS * sr) as usize + 1;
-        self.buffer_len = len.max(4);
-        self.buffer = vec![vec![0.0; self.buffer_len]; 2];
-        self.write_pos = 0;
-        self.lfo_phase = 0.0;
+        state.buffer_len = len.max(4);
+        state.buffer = vec![vec![0.0; state.buffer_len]; 2];
+        state.write_pos = 0;
+        state.lfo_phase = 0.0;
     }
 
     #[allow(clippy::needless_range_loop)]
     fn process(
-        &mut self,
+        state: &mut Self::DspState,
+        params: &Self::Params,
         buffer: &mut AudioBuffer,
         _events: &EventList,
         _context: &mut ProcessContext,
     ) -> ProcessStatus {
         let total = buffer.num_samples();
-        let buf_len = self.buffer_len;
+        let buf_len = state.buffer_len;
         #[allow(clippy::cast_precision_loss)]
         let buf_len_f = buf_len as f32;
-        let waveform = self.params.waveform.value();
-        let interp = self.params.interp.value();
-        let stereo = self.params.stereo.value();
+        let waveform = params.waveform.value();
+        let interp = params.interp.value();
+        let stereo = params.stereo.value();
         #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-        let num_voices = self.params.voices.value().clamp(2, 5) as usize;
-        let num_ch = buffer.channels().min(self.buffer.len());
+        let num_voices = params.voices.value().clamp(2, 5) as usize;
+        let num_ch = buffer.channels().min(state.buffer.len());
         let num_wet = num_voices - 1;
 
         let mut delay = [0.0_f32; MAX_BLOCK];
@@ -206,10 +206,10 @@ impl PluginLogic for Chorus {
 
             // Slice-based read advances each smoother by `n`. See
             // flanger for the rationale.
-            self.params.delay.read_into(&mut delay[..n]);
-            self.params.width.read_into(&mut width[..n]);
-            self.params.depth.read_into(&mut depth[..n]);
-            self.params.rate.read_into(&mut rate[..n]);
+            params.delay.read_into(&mut delay[..n]);
+            params.width.read_into(&mut width[..n]);
+            params.depth.read_into(&mut depth[..n]);
+            params.rate.read_into(&mut rate[..n]);
 
             // Pre-build the per-voice read trajectories and the
             // shared write head. Read positions are voice-shared
@@ -219,15 +219,15 @@ impl PluginLogic for Chorus {
             let mut read_pos = [[0.0_f32; MAX_BLOCK]; MAX_VOICES_MINUS_ONE];
             let mut write_idx = [0usize; MAX_BLOCK];
             for i in 0..n {
-                write_idx[i] = self.write_pos;
+                write_idx[i] = state.write_pos;
                 let mut phase_offset = 0.0_f32;
                 for v in 0..num_wet {
                     let local_delay = (delay[i]
-                        + width[i] * lfo(self.lfo_phase + phase_offset, waveform))
-                        * self.sample_rate;
+                        + width[i] * lfo(state.lfo_phase + phase_offset, waveform))
+                        * state.sample_rate;
                     #[allow(clippy::cast_precision_loss)]
                     let pos =
-                        (self.write_pos as f32 - local_delay + buf_len_f).rem_euclid(buf_len_f);
+                        (state.write_pos as f32 - local_delay + buf_len_f).rem_euclid(buf_len_f);
                     read_pos[v][i] = pos;
                     if num_voices == 3 {
                         phase_offset += 0.25;
@@ -237,19 +237,19 @@ impl PluginLogic for Chorus {
                         phase_offset += step;
                     }
                 }
-                self.write_pos += 1;
-                if self.write_pos >= buf_len {
-                    self.write_pos -= buf_len;
+                state.write_pos += 1;
+                if state.write_pos >= buf_len {
+                    state.write_pos -= buf_len;
                 }
-                self.lfo_phase += rate[i] / self.sample_rate;
-                if self.lfo_phase >= 1.0 {
-                    self.lfo_phase -= 1.0;
+                state.lfo_phase += rate[i] / state.sample_rate;
+                if state.lfo_phase >= 1.0 {
+                    state.lfo_phase -= 1.0;
                 }
             }
 
             for ch in 0..num_ch {
                 let (inp, out) = buffer.io(ch);
-                let line = &mut self.buffer[ch];
+                let line = &mut state.buffer[ch];
                 for i in 0..n {
                     let idx = offset + i;
                     let in_sample = inp[idx];
@@ -314,7 +314,6 @@ truce::plugin! {
     logic: Chorus,
     params: ChorusParams,
 }
-
 
 truce::enable_rt_paranoid!();
 
