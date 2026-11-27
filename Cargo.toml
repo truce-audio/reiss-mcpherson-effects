@@ -37,12 +37,10 @@ truce-au = { version = "7.0" }
 truce-standalone = { version = "7.0" }
 truce-gui = { version = "7.0", default-features = false }
 truce-gui-types = { version = "7.0" }
-truce-plugin = { version = "7.0" }
 truce-vst2 = { version = "7.0" }
 truce-lv2 = { version = "7.0" }
 truce-aax = { version = "7.0" }
 truce-loader = { version = "7.0" }
-truce-font = { version = "7.0" }
 truce-test = { version = "7.0" }
 clap-sys = "0.5"
 
